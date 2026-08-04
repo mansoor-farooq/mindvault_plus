@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, Note } from '@/lib/db';
-import { Plus, Search, Settings, Mic, FileText, FileUp, Star, Wallet, X, Trash2 } from 'lucide-react';
+import { Plus, Search, Settings, Mic, FileText, FileUp, Star, Wallet, X, Trash2, Brain } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import Link from 'next/link';
 
@@ -78,7 +78,12 @@ export default function Home() {
       <header className="bg-indigo-900 text-white p-4 shadow-md z-10 sticky top-0 min-h-[68px] flex flex-col justify-center transition-all duration-300">
         {!isSearchActive ? (
           <div className="flex justify-between items-center w-full animate-fade-in-up">
-            <h1 className="text-xl font-bold tracking-wide">MindVault</h1>
+            <div className="flex items-center gap-2">
+              <div className="bg-white/20 p-2 rounded-lg backdrop-blur-sm">
+                <Brain className="w-5 h-5 text-white" />
+              </div>
+              <h1 className="text-xl font-bold tracking-wide">MindVault</h1>
+            </div>
             <div className="flex gap-4 items-center">
               <Link href="/finance" className="hover:text-indigo-200 transition-colors">
                 <Wallet className="w-6 h-6" />
@@ -159,7 +164,7 @@ export default function Home() {
                   </h2>
                   <div className="space-y-4">
                     {groupNotes.map(note => (
-                      <div key={note.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex gap-3 hover:shadow-md transition-shadow cursor-pointer">
+                      <div key={note.id} className="bg-white p-4 rounded-xl shadow-sm flex gap-3 hover:shadow-md transition-shadow cursor-pointer">
                         {note.type === 'VOICE' && (
                           <div className="p-3 bg-red-50 text-red-500 rounded-xl h-fit">
                             <Mic className="w-6 h-6" />
