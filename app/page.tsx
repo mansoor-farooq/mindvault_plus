@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, Note } from '@/lib/db';
-import { Plus, Search, Settings, Mic, FileText, FileUp, Star, Wallet, X } from 'lucide-react';
+import { Plus, Search, Settings, Mic, FileText, FileUp, Star, Wallet, X, Trash2 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import Link from 'next/link';
 
@@ -83,11 +83,11 @@ export default function Home() {
               <Link href="/finance" className="hover:text-indigo-200 transition-colors">
                 <Wallet className="w-6 h-6" />
               </Link>
+              <Link href="/trash" className="hover:text-indigo-200 transition-colors">
+                <Trash2 className="w-6 h-6" />
+              </Link>
               <button onClick={() => setIsSearchActive(true)} className="hover:text-indigo-200 transition-colors">
                 <Search className="w-6 h-6" />
-              </button>
-              <button className="hover:text-indigo-200 transition-colors">
-                <Settings className="w-6 h-6" />
               </button>
             </div>
           </div>
@@ -179,7 +179,20 @@ export default function Home() {
                         <div className="flex-1 min-w-0">
                           <div className="flex justify-between items-start mb-1">
                             <h3 className="font-semibold text-gray-900 truncate pr-2">{note.title || 'Untitled'}</h3>
-                            {note.isFavorite && <Star className="w-4 h-4 text-amber-400 fill-amber-400 flex-shrink-0" />}
+                            <div className="flex items-center gap-2">
+                              {note.isFavorite && <Star className="w-4 h-4 text-amber-400 fill-amber-400 flex-shrink-0" />}
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if(note.id) {
+                                    db.notes.update(note.id, { isDeleted: true, deletedAt: new Date() });
+                                  }
+                                }}
+                                className="text-gray-300 hover:text-red-500 transition-colors"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
                           </div>
                           <p className="text-sm text-gray-500 line-clamp-2 mb-3">{note.description}</p>
                           <div className="flex items-center gap-2 text-xs text-gray-400">
