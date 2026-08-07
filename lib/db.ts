@@ -134,6 +134,7 @@ export interface KhataCustomer {
   name: string;
   phone?: string;
   address?: string;
+  openingBalance?: number;
   createdAt: Date;
   updatedAt: Date;
   isDeleted: boolean;

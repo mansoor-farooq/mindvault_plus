@@ -6,10 +6,12 @@ interface AuthState {
   user: User | null;
   token: string | null;
   isUnlocked: boolean;
+  shopModeEnabled: boolean;
   login: (user: User, token?: string) => void;
   logout: () => void;
   unlock: () => void;
   lock: () => void;
+  toggleShopMode: () => void;
   updateUser: (data: Partial<User>) => void;
 }
 
@@ -19,6 +21,7 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       token: null,
       isUnlocked: false,
+      shopModeEnabled: true,
       login: (user, token) => set({ user, token: token || null, isUnlocked: true }), 
       logout: () => {
         try {
@@ -27,6 +30,8 @@ export const useAuthStore = create<AuthState>()(
           db.udhaar.clear();
           db.bills.clear();
           db.syncStatus.clear();
+          db.khataCustomers.clear();
+          db.khataTransactions.clear();
         } catch (e) {
           console.error('Failed to clear local DB on logout', e);
         }
@@ -34,6 +39,7 @@ export const useAuthStore = create<AuthState>()(
       },
       unlock: () => set({ isUnlocked: true }),
       lock: () => set({ isUnlocked: false }),
+      toggleShopMode: () => set((state) => ({ shopModeEnabled: !state.shopModeEnabled })),
       updateUser: (data) => set((state) => ({ user: state.user ? { ...state.user, ...data } : null })),
     }),
     {
