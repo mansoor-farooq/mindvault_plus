@@ -6,6 +6,8 @@ import { db } from '@/lib/db';
 import bcrypt from 'bcryptjs';
 import Link from 'next/link';
 
+import { normalizeEmail } from '@/lib/utils';
+
 export default function Register() {
   const router = useRouter();
   const [fullName, setFullName] = useState('');
@@ -18,6 +20,8 @@ export default function Register() {
     e.preventDefault();
     setError('');
 
+    const cleanEmail = normalizeEmail(email);
+
     if (password.length < 8) {
       setError('Password must be at least 8 characters long.');
       return;
@@ -29,7 +33,7 @@ export default function Register() {
     }
 
     try {
-      const existingUser = await db.users.where('email').equalsIgnoreCase(email).first();
+      const existingUser = await db.users.where('email').equalsIgnoreCase(cleanEmail).first();
       if (existingUser) {
         setError('Email already exists. Please login.');
         return;
@@ -39,8 +43,8 @@ export default function Register() {
       const passwordHash = bcrypt.hashSync(password, salt);
 
       await db.users.add({
-        fullName,
-        email,
+        fullName: fullName.trim(),
+        email: cleanEmail,
         passwordHash,
         createdAt: new Date(),
       });

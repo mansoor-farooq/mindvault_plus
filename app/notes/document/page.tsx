@@ -53,10 +53,11 @@ export default function DocumentNotePage() {
         isFavorite: false,
         isDeleted: false,
       });
+      const createdNote = await db.notes.get(noteId);
 
       // 2. Create the Document entry
       await db.documents.add({
-        noteId: Number(noteId),
+        noteId: createdNote?.syncId || '',
         fileName: selectedFile.name,
         filePath: '', // For local it's stored in blob
         folder: 'Root',

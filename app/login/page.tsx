@@ -6,22 +6,81 @@ import { db } from '@/lib/db';
 import bcrypt from 'bcryptjs';
 import Link from 'next/link';
 import { useAuthStore } from '@/store/authStore';
+import BannedScreen from '@/components/BannedScreen';
+
+import { normalizeEmail } from '@/lib/utils';
 
 export default function Login() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isBanned, setIsBanned] = useState(false);
   const { login } = useAuthStore();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
+    const cleanEmail = normalizeEmail(email);
+
     try {
-      const user = await db.users.where('email').equalsIgnoreCase(email).first();
+      let user = await db.users.where('email').equalsIgnoreCase(cleanEmail).first();
+      let token = '';
+
+      // Check with backend if online to get latest ban status and JWT token
+      if (navigator.onLine) {
+        try {
+          const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+          const res = await fetch(`${BACKEND_URL}/api/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: cleanEmail, password })
+          });
+          
+          if (res.status === 403) {
+            await db.users.where('email').equalsIgnoreCase(cleanEmail).modify({ status: 'BANNED' });
+            if (user) user.status = 'BANNED';
+            setIsBanned(true);
+            return;
+          }
+
+          if (res.ok) {
+            const data = await res.json();
+            if (data.token) {
+              token = data.token;
+            }
+            const remoteStatus = (data.user?.status || 'ACTIVE') as 'ACTIVE' | 'BANNED';
+
+            if (user) {
+              await db.users.where('email').equalsIgnoreCase(cleanEmail).modify({ status: remoteStatus });
+              user.status = remoteStatus;
+            } else if (data.user) {
+              // Create user entry in local Dexie on new device login
+              const salt = bcrypt.genSaltSync(10);
+              const passwordHash = bcrypt.hashSync(password, salt);
+              const newId = await db.users.add({
+                fullName: data.user.full_name || cleanEmail,
+                email: cleanEmail,
+                passwordHash,
+                status: remoteStatus,
+                createdAt: new Date()
+              });
+              user = await db.users.get(newId);
+            }
+          }
+        } catch (err) {
+          console.warn('Backend login check failed, falling back to local auth');
+        }
+      }
+
       if (!user) {
         setError('Invalid email or password.');
+        return;
+      }
+
+      if (user.status === 'BANNED') {
+        setIsBanned(true);
         return;
       }
 
@@ -31,7 +90,7 @@ export default function Login() {
         return;
       }
 
-      login(user);
+      login(user, token);
 
       if (!user.pin) {
         router.push('/lock/setup'); // Pin setup if first time
@@ -42,6 +101,10 @@ export default function Login() {
       setError('Login failed: ' + err.message);
     }
   };
+
+  if (isBanned) {
+    return <BannedScreen onBack={() => setIsBanned(false)} />;
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
