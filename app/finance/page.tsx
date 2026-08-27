@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, Udhaar, UdhaarPayment, Bill } from '@/lib/db';
+import { suggestExpenseCategory } from '@/lib/smartSuggestions';
 import { ArrowLeft, Plus, Wallet, ArrowUpRight, ArrowDownRight, Users, CheckCircle2, History, X, Receipt, Calendar, Phone, Mail, LogOut, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { useAuthStore } from '@/store/authStore';
@@ -22,6 +23,11 @@ export default function FinanceDashboard() {
   const [ledgerData, setLedgerData] = useState({ type: 'EXPENSE' as 'INCOME'|'EXPENSE', amount: '', category: '', note: '', date: new Date().toISOString().split('T')[0], attachedPhotoBlob: null as Blob | null });
   const [udhaarData, setUdhaarData] = useState({ type: 'TO_GIVE' as 'TO_GIVE'|'TO_RECEIVE', personName: '', amount: '', dueDate: '' });
   const [billData, setBillData] = useState({ title: '', amount: '', dueDate: new Date().toISOString().split('T')[0], category: 'Utilities', note: '' });
+
+  const suggestedLedgerCategory = useMemo(() => {
+    if (ledgerData.type !== 'EXPENSE' || ledgerData.category.trim()) return null;
+    return suggestExpenseCategory(ledgerData.note);
+  }, [ledgerData.type, ledgerData.category, ledgerData.note]);
 
   // Fetch Data
   const ledgerEntries = useLiveQuery(() => db.ledgerEntries.filter(e => !e.isDeleted).reverse().sortBy('date')) || [];
@@ -178,9 +184,9 @@ export default function FinanceDashboard() {
 
   return (
     <main className="flex-1 flex flex-col bg-gray-50 h-screen">
-      <header className="bg-indigo-900 text-white p-4 flex items-center justify-between shadow-md sticky top-0 z-10">
+      <header className="bg-gradient-to-r from-indigo-600 to-violet-600 text-white p-4 flex items-center justify-between shadow-lg shadow-indigo-200/50 sticky top-0 z-10">
         <div className="flex items-center gap-3">
-          <Link href="/" className="p-2 hover:bg-indigo-800 rounded-full transition-colors">
+          <Link href="/" className="p-2 hover:bg-white/15 rounded-full transition-colors">
             <ArrowLeft className="w-6 h-6 text-white" />
           </Link>
           <h1 className="text-xl font-bold tracking-wide">Finance & Udhaar</h1>
@@ -561,12 +567,21 @@ export default function FinanceDashboard() {
                   </div>
                   <div className="mb-4">
                     <label className="block text-xs font-medium text-gray-500 mb-1">Category (e.g. Salary, Food)</label>
-                    <input 
+                    <input
                       type="text" required
                       value={ledgerData.category}
                       onChange={e => setLedgerData({...ledgerData, category: e.target.value})}
                       className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     />
+                    {suggestedLedgerCategory && (
+                      <button
+                        type="button"
+                        onClick={() => setLedgerData({ ...ledgerData, category: suggestedLedgerCategory })}
+                        className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-indigo-600 bg-indigo-50 border border-indigo-100 rounded-full px-2.5 py-1 hover:bg-indigo-100"
+                      >
+                        Suggested: {suggestedLedgerCategory}
+                      </button>
+                    )}
                   </div>
                   <div className="mb-4">
                     <label className="block text-xs font-medium text-gray-500 mb-1">Date</label>

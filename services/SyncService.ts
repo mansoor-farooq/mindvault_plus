@@ -2,8 +2,6 @@ import { db, Note, LedgerEntry, Udhaar } from '@/lib/db';
 import { useAuthStore } from '@/store/authStore';
 import { normalizeEmail } from '@/lib/utils';
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-
 export class SyncService {
   static async sync() {
     const user = useAuthStore.getState().user;
@@ -22,11 +20,17 @@ export class SyncService {
       const updatedDocuments = await db.documents.toArray(); // docs synced if any
       const updatedAnnotations = await db.annotations.toArray();
       const updatedReminders = await db.reminders.toArray();
+      const updatedChatMessages = await db.chatMessages.where('createdAt').above(lastSyncAt).toArray();
       const updatedLedger = await db.ledgerEntries.where('updatedAt').above(lastSyncAt).toArray();
       const updatedUdhaar = await db.udhaar.where('updatedAt').above(lastSyncAt).toArray();
       const updatedBills = await db.bills.where('updatedAt').above(lastSyncAt).toArray();
       const updatedKhataCustomers = await db.khataCustomers.where('updatedAt').above(lastSyncAt).toArray();
       const updatedKhataTxns = await db.khataTransactions.where('updatedAt').above(lastSyncAt).toArray();
+      const updatedProducts = await db.products.where('updatedAt').above(lastSyncAt).toArray();
+      const updatedProductVariants = await db.productVariants.where('updatedAt').above(lastSyncAt).toArray();
+      const updatedStockMovements = await db.stockMovements.where('updatedAt').above(lastSyncAt).toArray();
+      const updatedLocations = await db.locations.where('updatedAt').above(lastSyncAt).toArray();
+      const updatedCategories = await db.categories.where('updatedAt').above(lastSyncAt).toArray();
 
       // Prepare payload without blobs
       const payload = {
@@ -50,6 +54,10 @@ export class SyncService {
             const { id, syncId, ...rest } = r;
             return { ...rest, id: syncId, localId: id };
           }),
+          chatMessages: updatedChatMessages.map(m => {
+            const { id, syncId, ...rest } = m;
+            return { ...rest, id: syncId, localId: id };
+          }),
           ledger: updatedLedger.map(l => {
             const { attachedPhotoBlob, id, syncId, ...rest } = l;
             return { ...rest, id: syncId, localId: id };
@@ -69,6 +77,26 @@ export class SyncService {
           khataTransactions: updatedKhataTxns.map(kt => {
             const { id, syncId, ...rest } = kt;
             return { ...rest, id: syncId, localId: id };
+          }),
+          products: updatedProducts.map(p => {
+            const { id, syncId, ...rest } = p;
+            return { ...rest, id: syncId, localId: id };
+          }),
+          productVariants: updatedProductVariants.map(v => {
+            const { id, syncId, ...rest } = v;
+            return { ...rest, id: syncId, localId: id };
+          }),
+          stockMovements: updatedStockMovements.map(sm => {
+            const { id, syncId, ...rest } = sm;
+            return { ...rest, id: syncId, localId: id };
+          }),
+          locations: updatedLocations.map(l => {
+            const { id, syncId, ...rest } = l;
+            return { ...rest, id: syncId, localId: id };
+          }),
+          categories: updatedCategories.map(c => {
+            const { id, syncId, ...rest } = c;
+            return { ...rest, id: syncId, localId: id };
           })
         }
       };
@@ -79,10 +107,20 @@ export class SyncService {
       let currentToken = token;
       if (!currentToken) {
         // Try to get token via sync-login
-        const authRes = await fetch(`${BACKEND_URL}/api/auth/sync-login`, {
+        const authRes = await fetch(`/api/auth/sync-login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: cleanEmail, fullName: user.fullName || cleanEmail })
+          body: JSON.stringify({
+            email: cleanEmail,
+            fullName: user.fullName || cleanEmail,
+            country: user.country,
+            city: user.city,
+            religion: user.religion,
+            namazRemindersEnabled: user.namazRemindersEnabled,
+            businessType: user.businessType,
+            accountType: user.accountType,
+            organizationName: user.organizationName,
+          })
         });
         if (authRes.ok) {
           const authData = await authRes.json();
@@ -95,7 +133,7 @@ export class SyncService {
       }
 
       // 3. Send to backend
-      const response = await fetch(`${BACKEND_URL}/api/sync`, {
+      const response = await fetch(`/api/sync`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -145,7 +183,35 @@ export class SyncService {
       }
 
       // 5. Apply server changes to local DB matching by syncId (Sync Order: Parents before Children)
-      await db.transaction('rw', [db.notes, db.documents, db.annotations, db.reminders, db.ledgerEntries, db.udhaar, db.bills, db.khataCustomers, db.khataTransactions], async () => {
+      await db.transaction('rw', [db.notes, db.documents, db.annotations, db.reminders, db.chatMessages, db.ledgerEntries, db.udhaar, db.bills, db.khataCustomers, db.khataTransactions, db.products, db.productVariants, db.stockMovements, db.featureUsage, db.locations, db.categories], async () => {
+        // 0. Locations (Parent - must exist locally before Products/StockMovements/KhataCustomers reference them)
+        if (serverData.locations?.length) {
+          for (const sloc of serverData.locations) {
+            const existing = await db.locations.where('syncId').equals(sloc.id).first();
+            const locData = { ...sloc, syncId: sloc.id, updatedAt: new Date(sloc.updatedAt), createdAt: new Date(sloc.createdAt) };
+            delete locData.id;
+            if (existing) {
+              await db.locations.update(existing.id!, locData);
+            } else {
+              await db.locations.add(locData);
+            }
+          }
+        }
+
+        // 0b. Categories (Parent - self-referencing tree, must exist locally before Products reference them)
+        if (serverData.categories?.length) {
+          for (const scat of serverData.categories) {
+            const existing = await db.categories.where('syncId').equals(scat.id).first();
+            const catData = { ...scat, syncId: scat.id, updatedAt: new Date(scat.updatedAt), createdAt: new Date(scat.createdAt) };
+            delete catData.id;
+            if (existing) {
+              await db.categories.update(existing.id!, catData);
+            } else {
+              await db.categories.add(catData);
+            }
+          }
+        }
+
         // 1. Notes (Parent)
         if (serverData.notes?.length) {
           for (const sn of serverData.notes) {
@@ -234,6 +300,26 @@ export class SyncService {
           }
         }
 
+        // 5b. Chat Messages (Child of Note)
+        if (serverData.chatMessages?.length) {
+          for (const scm of serverData.chatMessages) {
+            // FK Validation: Ensure parent Note exists
+            const parentNote = await db.notes.where('syncId').equals(scm.noteId).first();
+            if (!parentNote && scm.noteId) {
+              console.warn(`Skipping chat message syncId ${scm.id}: parent Note ${scm.noteId} not found locally.`);
+              continue;
+            }
+            const existing = await db.chatMessages.where('syncId').equals(scm.id).first();
+            const msgData = { ...scm, syncId: scm.id, createdAt: new Date(scm.createdAt) };
+            delete msgData.id;
+            if (existing) {
+              await db.chatMessages.update(existing.id!, msgData);
+            } else {
+              await db.chatMessages.add(msgData);
+            }
+          }
+        }
+
         // 6. Ledger Entries
         if (serverData.ledger?.length) {
           for (const sl of serverData.ledger) {
@@ -295,6 +381,68 @@ export class SyncService {
             }
           }
         }
+
+        // 10. Products (Parent)
+        if (serverData.products?.length) {
+          for (const sp of serverData.products) {
+            const existing = await db.products.where('syncId').equals(sp.id).first();
+            const prodData = { ...sp, syncId: sp.id, updatedAt: new Date(sp.updatedAt), createdAt: new Date(sp.createdAt) };
+            delete prodData.id;
+            if (existing) {
+              await db.products.update(existing.id!, prodData);
+            } else {
+              await db.products.add(prodData);
+            }
+          }
+        }
+
+        // 10b. Product Variants (Child of Product, Parent of variant-tagged StockMovements)
+        if (serverData.productVariants?.length) {
+          for (const sv of serverData.productVariants) {
+            const parentProduct = await db.products.where('syncId').equals(sv.productId).first();
+            if (!parentProduct && sv.productId) {
+              console.warn(`Skipping productVariant syncId ${sv.id}: parent Product ${sv.productId} not found locally.`);
+              continue;
+            }
+            const existing = await db.productVariants.where('syncId').equals(sv.id).first();
+            const varData = { ...sv, syncId: sv.id, updatedAt: new Date(sv.updatedAt), createdAt: new Date(sv.createdAt) };
+            delete varData.id;
+            if (existing) {
+              await db.productVariants.update(existing.id!, varData);
+            } else {
+              await db.productVariants.add(varData);
+            }
+          }
+        }
+
+        // 11. Stock Movements (Child of Product)
+        if (serverData.stockMovements?.length) {
+          for (const ssm of serverData.stockMovements) {
+            const parentProduct = await db.products.where('syncId').equals(ssm.productId).first();
+            if (!parentProduct && ssm.productId) {
+              console.warn(`Skipping stockMovement syncId ${ssm.id}: parent Product ${ssm.productId} not found locally.`);
+              continue;
+            }
+            const existing = await db.stockMovements.where('syncId').equals(ssm.id).first();
+            const smData = { ...ssm, syncId: ssm.id, updatedAt: new Date(ssm.updatedAt), createdAt: new Date(ssm.createdAt) };
+            delete smData.id;
+            if (existing) {
+              await db.stockMovements.update(existing.id!, smData);
+            } else {
+              await db.stockMovements.add(smData);
+            }
+          }
+        }
+
+        // 12. Feature Usage
+        if (serverData.featureUsage?.length) {
+          await db.featureUsage.clear();
+          for (const sfu of serverData.featureUsage) {
+            const fuData = { ...sfu };
+            delete fuData.id; // let Dexie auto-increment ID
+            await db.featureUsage.add(fuData);
+          }
+        }
       });
 
       // 6. Update sync status
@@ -315,7 +463,7 @@ export class SyncService {
     if (user) formData.append('userId', user.id?.toString() || '');
 
     try {
-      const res = await fetch(`${BACKEND_URL}/api/sync/upload`, {
+      const res = await fetch(`/api/sync/upload`, {
         method: 'POST',
         headers: token ? {
           'Authorization': `Bearer ${token}`

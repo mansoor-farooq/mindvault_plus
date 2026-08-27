@@ -1,9 +1,12 @@
 "use client";
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { FileUp, File, ArrowLeft, Save, X } from 'lucide-react';
+import { FileUp, File, ArrowLeft, Save, X, Tag, Sparkles, Loader2 } from 'lucide-react';
 import { db } from '@/lib/db';
+import { suggestNoteTags } from '@/lib/smartSuggestions';
+import { useNoteAssist } from '@/hooks/useNoteAssist';
+import AdModal from '@/components/AdModal';
 import Link from 'next/link';
 
 const CATEGORIES = ['Business', 'Study', 'Personal'];
@@ -11,11 +14,33 @@ const CATEGORIES = ['Business', 'Study', 'Personal'];
 export default function DocumentNotePage() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('Study');
+  const [tags, setTags] = useState<string[]>([]);
+  const [summary, setSummary] = useState('');
+  const [showAdModal, setShowAdModal] = useState(false);
+  const { summarize, suggestTags: aiSuggestTags, isSummarizing, isTagging, error: aiError, limitReached, clearError } = useNoteAssist();
+
+  const suggestedTags = useMemo(() => suggestNoteTags(title, description), [title, description]);
+  const canUseAi = description.trim().length >= 10;
+  const toggleTag = (tag: string) => {
+    setTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
+  };
+
+  const handleAiSummarize = async () => {
+    clearError();
+    const result = await summarize(title, description);
+    if (result) setSummary(result);
+  };
+
+  const handleAiTags = async () => {
+    clearError();
+    const result = await aiSuggestTags(title, description);
+    if (result.length > 0) setTags(prev => Array.from(new Set([...prev, ...result])));
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -47,7 +72,8 @@ export default function DocumentNotePage() {
         description,
         type: 'DOCUMENT',
         category,
-        tags: [],
+        tags,
+        summary: summary || undefined,
         createdAt: new Date(),
         updatedAt: new Date(),
         isFavorite: false,
@@ -78,7 +104,7 @@ export default function DocumentNotePage() {
 
   return (
     <main className="flex-1 flex flex-col bg-gray-50 h-screen">
-      <header className="bg-white p-4 flex items-center justify-between shadow-sm sticky top-0 z-10">
+      <header className="bg-white/80 backdrop-blur-xl p-4 flex items-center justify-between border-b border-gray-100 sticky top-0 z-10">
         <div className="flex items-center gap-3">
           <Link href="/" className="p-2 hover:bg-gray-100 rounded-full transition-colors">
             <ArrowLeft className="w-6 h-6 text-gray-700" />
@@ -163,10 +189,77 @@ export default function DocumentNotePage() {
                 onChange={(e) => setDescription(e.target.value)}
                 className="w-full h-32 resize-none text-gray-600 placeholder-gray-400 focus:outline-none bg-transparent mt-2 leading-relaxed"
               />
+
+              {(suggestedTags.length > 0 || tags.length > 0) && (
+                <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-gray-100">
+                  <Tag className="w-3.5 h-3.5 text-gray-400" />
+                  {Array.from(new Set([...tags, ...suggestedTags])).map(tag => (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => toggleTag(tag)}
+                      className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors border ${
+                        tags.includes(tag)
+                          ? 'bg-indigo-600 border-indigo-600 text-white'
+                          : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+                      }`}
+                    >
+                      {tag}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {canUseAi && (
+                <div className="flex flex-col gap-2 pt-2 border-t border-gray-100">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleAiSummarize}
+                      disabled={isSummarizing}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-100 hover:bg-purple-100 disabled:opacity-50"
+                    >
+                      {isSummarizing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                      Summarize
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleAiTags}
+                      disabled={isTagging}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-100 hover:bg-purple-100 disabled:opacity-50"
+                    >
+                      {isTagging ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                      AI Tags
+                    </button>
+                  </div>
+                  {aiError && (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-xs text-rose-500">{aiError}</p>
+                      {limitReached && (
+                        <button
+                          type="button"
+                          onClick={() => setShowAdModal(true)}
+                          className="text-xs font-bold text-indigo-600 underline"
+                        >
+                          Watch an ad for +5
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  {summary && (
+                    <div className="bg-purple-50/50 border border-purple-100 rounded-xl p-3">
+                      <p className="text-[10px] font-bold text-purple-500 uppercase tracking-wide mb-1">AI Summary</p>
+                      <p className="text-xs text-gray-600">{summary}</p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </>
         )}
       </div>
+
+      <AdModal isOpen={showAdModal} onClose={() => { setShowAdModal(false); clearError(); }} featureKey="ai_notes_assist" />
     </main>
   );
 }

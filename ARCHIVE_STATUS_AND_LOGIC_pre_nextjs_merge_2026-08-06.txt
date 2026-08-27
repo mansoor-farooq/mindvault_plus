@@ -1,0 +1,55 @@
+# MindVault - Status and Logic Documentation
+
+## 1. Overall System Architecture
+MindVault is a local-first, offline-capable progressive web application (PWA).
+- **Frontend Stack**: Next.js, React, Tailwind CSS, Lucide Icons.
+- **Local Database**: Dexie.js (IndexedDB wrapper) is the primary source of truth. The app reads and writes instantly to the local database, allowing offline functionality.
+- **Backend Stack**: Node.js, Express, PostgreSQL, JWT Authentication.
+- **Sync Architecture**: `SyncService.ts` runs on the frontend and periodically sends data to the backend via `/api/sync`. Every record in IndexedDB has a `syncId` (UUID) which maps to `frontend_id` in PostgreSQL to prevent duplicate records and ID collisions across devices.
+- **Soft Delete (Trash)**: Deleting any record does not remove it instantly. Instead, `isDeleted = true` is set. The item moves to the Trash view where it can be restored. A cron job permanently purges items older than 30 days.
+
+## 2. Implemented Features & Logic
+
+### 2.1 Notes (Implemented)
+- **Logic**: Users can add, edit, delete, and search notes. Notes can have different colors and types (Work, Personal, Ideas).
+- **Status**: Complete. Fully integrated with Dexie and PostgreSQL sync.
+
+### 2.2 Ledger / Expense Tracker (Implemented)
+- **Logic**: Tracks Daily Expenses and Incomes. It calculates total balance, total income, and total expense.
+- **Status**: Complete. Fully synced.
+
+### 2.3 Udhaar / Debt Manager (Implemented)
+- **Logic**: Tracks money given (`GIVEN`) or taken (`TAKEN`) from individuals. Provides net totals.
+- **Status**: Complete. Fully synced.
+
+### 2.4 Bill Management (Implemented)
+- **Logic**: Tracks upcoming utility bills, due dates, and paid status.
+- **Status**: Complete. Fully synced.
+
+### 2.5 Trash & Soft Delete (Implemented)
+- **Logic**: All modules (Notes, Ledger, Udhaar, Bills, Khata) use soft deletes (`isDeleted = true`). The Trash dashboard allows filtering by category and restoring items back to the active dashboard.
+- **Status**: Complete. Trash system is universal across the app.
+
+### 2.6 Khata / Shop Mode (Implemented)
+- **Logic**: A dedicated B2B/B2C module for shopkeepers.
+  - **Customers**: Add customers with Name, Phone, and Address.
+  - **Transactions**: For each customer, record `CREDIT` (You gave items/credit) or `DEBIT` (You received payment).
+  - **Calculations**: Automatically computes individual balances (who owes whom) and a grand "Total Market Credit" (Total amount you have to receive from the market).
+  - **WhatsApp Reminders**: Automatically generates a pre-filled WhatsApp message with the outstanding balance to send to the customer using their provided phone number via the `wa.me` URL scheme.
+- **Status**: Complete. Frontend UI (`/khata`), Dexie schemas (`khataCustomers`, `khataTransactions`), PostgreSQL tables, and `SyncService` are fully implemented and integrated with the Trash system.
+
+### 2.7 Role-Based Access Control (RBAC) (Implemented)
+- **Logic**: The backend separates User and Admin routes.
+  - Normal users sync via `jwtAuth.js` middleware.
+  - Admin users use `adminAuth.js` middleware, allowing super-users to view overall statistics and access admin routes (e.g., audit logs, global user stats).
+- **Status**: Backend fully supports RBAC.
+
+## 3. Pending / Future Features (What's Left)
+
+1. **Admin Panel UI**: We need a frontend dashboard for the Admin (`/app/admin`) to view system-wide statistics (how many users, active syncs, etc.) and view the `admin_logs` table.
+2. **Bill Splitting**: A Splitwise-style feature where users can split bills among groups.
+3. **Referral / Growth System**: Let users refer others to unlock premium features.
+4. **Push Notifications**: PWA push notifications for due bills.
+
+## 4. Current Status
+Your web application is fully operational. The backend is running on `http://localhost:5000` and Next.js frontend is on `http://localhost:3000`. You can now open `http://localhost:3000/khata` to test the new Shop/Khata mode!

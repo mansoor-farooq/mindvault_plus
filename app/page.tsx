@@ -1,24 +1,53 @@
 "use client";
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, Note } from '@/lib/db';
-import { Plus, Search, Settings, Mic, FileText, FileUp, Star, Wallet, X, Trash2, Cloud, Loader2, User as UserIcon, LogOut, Lock, LayoutGrid, List, Store } from 'lucide-react';
+import { Plus, Search, Mic, FileText, FileUp, Star, Wallet, X, Cloud, Loader2, User as UserIcon, LogOut, Lock, LayoutGrid, List, Store, Sparkles, HardDrive } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import Link from 'next/link';
 import { SyncService } from '@/services/SyncService';
 import BannedScreen from '@/components/BannedScreen';
 import { useRouter } from 'next/navigation';
+import { TOOL_CATEGORIES } from '@/lib/toolCategories';
 
 const CATEGORIES = ['All', 'Business', 'Meeting', 'Study', 'Personal', 'Event'];
 
 export default function Home() {
   const router = useRouter();
-  const { user, logout } = useAuthStore();
+  const { user, logout, featureAccess } = useAuthStore();
+
+  // A category card is only hidden once ALL of its tools are gated off - partial hiding
+  // happens at the per-tool level inside its own dashboard page. null featureAccess means
+  // "not fetched yet" and is treated as "allow everything" to avoid a flash of hidden tools.
+  const isToolVisible = (tool: { showIf?: (u: typeof user) => boolean; featureKey?: string }) => {
+    if (tool.showIf && !tool.showIf(user)) return false;
+    if (tool.featureKey && featureAccess && featureAccess[tool.featureKey] === false) return false;
+    return true;
+  };
+  const visibleCategories = TOOL_CATEGORIES.filter((cat) => cat.tools.some(isToolVisible));
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [isFabOpen, setIsFabOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const profileButtonRef = useRef<HTMLDivElement>(null);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
   const [isSyncing, setIsSyncing] = useState(false);
+
+  useEffect(() => {
+    if (!isProfileOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as Node;
+      const clickedButton = profileButtonRef.current?.contains(target);
+      const clickedMenu = profileMenuRef.current?.contains(target);
+      if (!clickedButton && !clickedMenu) {
+        setIsProfileOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isProfileOpen]);
+
   const handleLogout = () => {
     logout();
     router.push('/login');
@@ -125,7 +154,8 @@ export default function Home() {
   }
 
   const NoteCard = ({ note }: { note: Note }) => (
-    <div 
+    <div
+      onClick={() => note.syncId && router.push(`/notes/${note.syncId}`)}
       className={`bg-white/80 backdrop-blur-md p-5 rounded-2xl shadow-sm border border-gray-100/50 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer flex gap-4 ${viewMode === 'grid' ? 'flex-col' : 'items-start'}`}
       style={{ boxShadow: '0 4px 20px -2px rgba(0,0,0,0.05)' }}
     >
@@ -191,44 +221,76 @@ export default function Home() {
         <div className="p-4">
           {!isSearchActive ? (
             <div className="flex justify-between items-center w-full animate-fade-in-up">
-              <h1 className="text-2xl font-black bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent tracking-tight">
-                MindVault
-              </h1>
+              <div>
+                <h1 className="text-2xl font-black bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent tracking-tight leading-none">
+                  MindVault
+                </h1>
+                <p className="text-xs text-gray-400 font-medium mt-0.5">{notes?.length || 0} notes saved</p>
+              </div>
               <div className="flex gap-4 items-center text-gray-600">
+                <Link
+                  href="/admin"
+                  className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-xs font-bold shadow-md hover:shadow-lg hover:scale-105 transition-all flex items-center gap-1.5"
+                  title="Open Minimal UI Admin Dashboard"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  <span className="hidden sm:inline">Admin Dashboard</span>
+                </Link>
+
                 <button onClick={() => setIsSearchActive(true)} className="hover:text-indigo-600 transition-colors">
                   <Search className="w-6 h-6" />
                 </button>
                 
-                {/* User Profile Dropdown */}
-                <div className="relative">
-                  <button 
-                    onClick={() => setIsProfileOpen(!isProfileOpen)} 
+                {/* User Profile Dropdown - menu is portaled to document.body (see below)
+                    because Chromium mis-stacks position:absolute descendants of a
+                    position:sticky + backdrop-filter header against normal-flow siblings,
+                    painting them behind page content instead of above it. */}
+                <div className="relative" ref={profileButtonRef}>
+                  <button
+                    onClick={() => setIsProfileOpen(!isProfileOpen)}
                     className="flex items-center justify-center bg-gradient-to-tr from-indigo-600 to-violet-600 text-white rounded-full w-9 h-9 shadow-md hover:shadow-lg transition-all hover:scale-105"
                   >
                     <UserIcon className="w-5 h-5" />
                   </button>
-                  
-                  {isProfileOpen && (
-                    <div className="absolute right-0 mt-3 w-64 bg-white/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-gray-100 overflow-hidden text-gray-800 z-50 animate-fade-in-up">
-                      <div className="p-5 border-b border-gray-100 bg-gradient-to-b from-indigo-50/50 to-transparent">
-                        <p className="font-bold text-base truncate">{user?.fullName || 'User'}</p>
-                        <p className="text-sm text-gray-500 truncate">{user?.email}</p>
-                        <div className="mt-3 inline-block px-3 py-1 bg-indigo-100 text-indigo-700 text-xs font-bold rounded-full tracking-wide">
-                          {user?.license || 'FREE'} PLAN
-                        </div>
-                      </div>
-                      <div className="p-2">
-                        <button 
-                          onClick={handleLogout}
-                          className="w-full text-left px-4 py-3 text-sm text-red-600 font-medium hover:bg-red-50 rounded-xl flex items-center gap-3 transition-colors"
-                        >
-                          <LogOut className="w-5 h-5" />
-                          Log out
-                        </button>
+                </div>
+
+                {isProfileOpen && typeof document !== 'undefined' && createPortal(
+                  <div ref={profileMenuRef} className="fixed top-16 right-4 w-64 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden text-gray-800 z-50 animate-fade-in-up">
+                    <div className="p-5 border-b border-gray-100 bg-gradient-to-b from-indigo-50/50 to-transparent">
+                      <p className="font-bold text-base truncate">{user?.fullName || 'User'}</p>
+                      <p className="text-sm text-gray-500 truncate">{user?.email}</p>
+                      <div className="mt-3 inline-block px-3 py-1 bg-indigo-100 text-indigo-700 text-xs font-bold rounded-full tracking-wide">
+                        {user?.license || 'FREE'} PLAN
                       </div>
                     </div>
-                  )}
-                </div>
+                    <div className="p-2 space-y-1">
+                      <Link
+                        href="/settings"
+                        onClick={() => setIsProfileOpen(false)}
+                        className="w-full text-left px-4 py-3 text-sm text-gray-700 font-medium hover:bg-gray-50 rounded-xl flex items-center gap-3 transition-colors"
+                      >
+                        <HardDrive className="w-5 h-5 text-gray-400" />
+                        Settings &amp; Backup
+                      </Link>
+                      <Link
+                        href="/admin"
+                        onClick={() => setIsProfileOpen(false)}
+                        className="w-full text-left px-4 py-3 text-sm text-indigo-600 font-bold hover:bg-indigo-50 rounded-xl flex items-center gap-3 transition-colors"
+                      >
+                        <Sparkles className="w-5 h-5 text-indigo-600" />
+                        Minimal UI Admin
+                      </Link>
+                      <button
+                        onClick={handleLogout}
+                        className="w-full text-left px-4 py-3 text-sm text-red-600 font-medium hover:bg-red-50 rounded-xl flex items-center gap-3 transition-colors"
+                      >
+                        <LogOut className="w-5 h-5" />
+                        Log out
+                      </button>
+                    </div>
+                  </div>,
+                  document.body
+                )}
               </div>
             </div>
           ) : (
@@ -252,46 +314,59 @@ export default function Home() {
           )}
         </div>
 
-        {/* Stats Widget */}
-        <div className="px-4 pb-4">
-          <div className="flex items-center justify-between bg-gradient-to-r from-indigo-600 to-violet-600 p-4 rounded-2xl shadow-lg text-white">
-            <div className="flex flex-col">
-              <span className="text-indigo-100 text-xs font-medium tracking-wider uppercase mb-1">Total Balance</span>
-              <span className="text-2xl font-bold">Rs {stats.balance.toLocaleString()}</span>
+        {/* Hero Cards: the two things people open this app for most */}
+        <div className="px-4 pb-3 grid grid-cols-2 gap-3">
+          <Link
+            href="/finance"
+            className="relative overflow-hidden bg-gradient-to-br from-indigo-600 to-violet-600 p-4 rounded-2xl shadow-lg shadow-indigo-200/50 text-white flex flex-col justify-between gap-6 hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300"
+          >
+            <div className="absolute -right-4 -top-4 w-20 h-20 rounded-full bg-white/10" />
+            <div className="p-2 rounded-xl bg-white/15 w-fit">
+              <Wallet className="w-5 h-5" />
             </div>
-            <div className="w-px h-10 bg-white/20 mx-4"></div>
-            <div className="flex flex-col">
-              <span className="text-indigo-100 text-xs font-medium tracking-wider uppercase mb-1">Total Notes</span>
-              <span className="text-2xl font-bold">{notes?.length || 0}</span>
+            <div>
+              <p className="text-[11px] font-semibold text-indigo-100 uppercase tracking-wider mb-0.5">Balance</p>
+              <p className="text-xl font-black tracking-tight">Rs {stats.balance.toLocaleString()}</p>
             </div>
-          </div>
+          </Link>
+          <Link
+            href="/khata"
+            className="relative overflow-hidden bg-gradient-to-br from-emerald-500 to-teal-600 p-4 rounded-2xl shadow-lg shadow-emerald-200/50 text-white flex flex-col justify-between gap-6 hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300"
+          >
+            <div className="absolute -right-4 -top-4 w-20 h-20 rounded-full bg-white/10" />
+            <div className="p-2 rounded-xl bg-white/15 w-fit">
+              <Store className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-[11px] font-semibold text-emerald-50 uppercase tracking-wider mb-0.5">Shop</p>
+              <p className="text-xl font-black tracking-tight">Dukaan Khata</p>
+            </div>
+          </Link>
         </div>
 
-        {/* Quick Tools Grid */}
-        <div className="px-4 pb-4 grid grid-cols-2 md:grid-cols-4 gap-3">
-          <Link href="/finance" className="bg-white/80 backdrop-blur-md p-4 rounded-2xl shadow-sm border border-gray-100/50 flex flex-col items-center justify-center gap-3 hover:shadow-lg hover:-translate-y-1 transition-all">
-            <div className="bg-blue-50 text-blue-500 p-3 rounded-full">
-              <Wallet className="w-6 h-6" />
+        {/* Tool categories - grouped instead of one long flat scrollable strip */}
+        <div className="px-4 pb-4 grid grid-cols-2 gap-2.5">
+          {visibleCategories.map((cat) => (
+            <Link
+              key={cat.id}
+              href={`/dashboard/${cat.id}`}
+              className="flex items-center gap-2.5 bg-white/80 backdrop-blur-md p-3 rounded-2xl shadow-sm border border-gray-100/50 hover:shadow-md hover:-translate-y-0.5 transition-all duration-300"
+            >
+              <div className={`p-2 rounded-xl ${cat.colorClass}`}>
+                <cat.icon className="w-4 h-4" />
+              </div>
+              <span className="font-semibold text-gray-700 text-xs">{cat.label}</span>
+            </Link>
+          ))}
+          <button
+            onClick={handleSync}
+            disabled={isSyncing}
+            className="col-span-2 flex items-center justify-center gap-2.5 bg-white/80 backdrop-blur-md p-3 rounded-2xl shadow-sm border border-gray-100/50 hover:shadow-md transition-all duration-300 disabled:opacity-60"
+          >
+            <div className="p-2 rounded-xl text-indigo-600 bg-indigo-50">
+              {isSyncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Cloud className="w-4 h-4" />}
             </div>
-            <span className="font-bold text-gray-700 text-sm">Finance & Bills</span>
-          </Link>
-          <Link href="/khata" className="bg-white/80 backdrop-blur-md p-4 rounded-2xl shadow-sm border border-gray-100/50 flex flex-col items-center justify-center gap-3 hover:shadow-lg hover:-translate-y-1 transition-all">
-            <div className="bg-emerald-50 text-emerald-500 p-3 rounded-full">
-              <Store className="w-6 h-6" />
-            </div>
-            <span className="font-bold text-gray-700 text-sm">Dukaan Khata</span>
-          </Link>
-          <Link href="/trash" className="bg-white/80 backdrop-blur-md p-4 rounded-2xl shadow-sm border border-gray-100/50 flex flex-col items-center justify-center gap-3 hover:shadow-lg hover:-translate-y-1 transition-all">
-            <div className="bg-red-50 text-red-500 p-3 rounded-full">
-              <Trash2 className="w-6 h-6" />
-            </div>
-            <span className="font-bold text-gray-700 text-sm">Recycle Bin</span>
-          </Link>
-          <button onClick={handleSync} disabled={isSyncing} className="bg-white/80 backdrop-blur-md p-4 rounded-2xl shadow-sm border border-gray-100/50 flex flex-col items-center justify-center gap-3 hover:shadow-lg hover:-translate-y-1 transition-all disabled:opacity-70 disabled:hover:translate-y-0 disabled:hover:shadow-sm">
-            <div className="bg-indigo-50 text-indigo-500 p-3 rounded-full">
-              {isSyncing ? <Loader2 className="w-6 h-6 animate-spin" /> : <Cloud className="w-6 h-6" />}
-            </div>
-            <span className="font-bold text-gray-700 text-sm">Cloud Sync</span>
+            <span className="font-semibold text-gray-700 text-xs">{isSyncing ? 'Syncing...' : 'Cloud Sync'}</span>
           </button>
         </div>
 

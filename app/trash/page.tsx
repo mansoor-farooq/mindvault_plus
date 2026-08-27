@@ -58,9 +58,9 @@ export default function TrashPage() {
 
   return (
     <main className="flex-1 flex flex-col bg-gray-50 h-screen">
-      <header className="bg-indigo-900 text-white p-4 flex items-center justify-between shadow-md sticky top-0 z-10">
+      <header className="bg-gradient-to-r from-indigo-600 to-violet-600 text-white p-4 flex items-center justify-between shadow-lg shadow-indigo-200/50 sticky top-0 z-10">
         <div className="flex items-center gap-3">
-          <Link href="/" className="p-2 hover:bg-indigo-800 rounded-full transition-colors">
+          <Link href="/" className="p-2 hover:bg-white/15 rounded-full transition-colors">
             <ArrowLeft className="w-6 h-6 text-white" />
           </Link>
           <h1 className="text-xl font-bold tracking-wide">Trash (Recycle Bin)</h1>

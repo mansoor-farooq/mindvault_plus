@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node tests/cross_user_isolation_regression.test.js)",
+      "Bash(npx jest *)",
+      "Bash(npm install *)",
+      "Bash(node -e ' *)",
+      "Bash(node -e \"console.log\\(require\\('next/server'\\).NextRequest\\)\")",
+      "Bash(curl -s -X POST http://localhost:3000/api/auth/register -H 'Content-Type: application/json' -d '{\"full_name\":\"Smoke Test\",\"email\":\"phasea_smoketest___CMDSUB_OUTPUT__@test.com\",\"password\":\"testpass123\"}')",
+      "Bash(curl -s -X POST http://localhost:3000/api/auth/login -H 'Content-Type: application/json' -d '{\"email\":\"phasea_smoketest___CMDSUB_OUTPUT__@test.com\",\"password\":\"testpass123\"}')",
+      "Bash(curl -s -X POST http://localhost:3000/api/auth/status -H 'Content-Type: application/json' -d '{\"email\":\"phasea_smoketest___CMDSUB_OUTPUT__@test.com\"}')"
+    ]
+  }
+}

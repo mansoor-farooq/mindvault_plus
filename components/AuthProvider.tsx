@@ -7,7 +7,7 @@ import { useAuthStore } from "@/store/authStore";
 import BannedScreen from "@/components/BannedScreen";
 
 export default function AuthProvider({ children }: { children: React.ReactNode }) {
-  const { user, isUnlocked } = useAuthStore();
+  const { user, isUnlocked, token, setFeatureAccess } = useAuthStore();
   const router = useRouter();
   const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
@@ -16,8 +16,14 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     setMounted(true);
   }, []);
 
+  // The admin panel (/admin/*) has its own independent session-cookie auth
+  // (adminAuth middleware + AdminSessionProvider) - it must never be subject
+  // to the consumer app's JWT/PIN-lock guard below, or every /admin route
+  // gets bounced to the consumer /login before the admin code ever runs.
+  const isAdminRoute = pathname.startsWith("/admin");
+
   useEffect(() => {
-    if (!mounted) return;
+    if (!mounted || isAdminRoute) return;
 
     const publicPaths = ["/login", "/register"];
     const isPublicPath = publicPaths.includes(pathname);
@@ -27,17 +33,45 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     } else if (user && !isUnlocked && pathname !== "/lock" && !isPublicPath) {
       router.replace("/lock");
     } else if (user && isUnlocked && isPublicPath) {
-      router.replace("/");
+      // The single place that decides where a freshly-authenticated user on
+      // /login or /register goes next. Login/register pages used to also call
+      // router.push() themselves right after calling login() - since that
+      // triggers this same effect, the two navigations raced, and this one
+      // always won, silently sending every first-time user straight past PIN
+      // setup. Centralizing it here (checking user.pin) is what actually fixes it.
+      router.replace(user.pin ? "/" : "/lock/setup");
     }
-  }, [user, isUnlocked, pathname, router, mounted]);
+  }, [user, isUnlocked, pathname, router, mounted, isAdminRoute]);
+
+  useEffect(() => {
+    if (!token || !mounted) return;
+    // Fetch which features this user is allowed to use (admin-controlled per-user
+    // toggles/VIP grants) - refetched alongside the periodic sync below so an
+    // admin's change is picked up within a few minutes, not just at next login.
+    const fetchFeatureAccess = async () => {
+      try {
+        const res = await fetch('/api/user/feature-access', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setFeatureAccess(data.access);
+        }
+      } catch {
+        // offline or transient error - keep whatever access map we already have
+      }
+    };
+    fetchFeatureAccess();
+    const featureAccessInterval = setInterval(fetchFeatureAccess, 5 * 60 * 1000);
+    return () => clearInterval(featureAccessInterval);
+  }, [token, mounted, setFeatureAccess]);
 
   useEffect(() => {
     if (user && mounted) {
       // Periodic check for account status (ban/unban)
       const checkStatus = async () => {
         try {
-          const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-          const res = await fetch(`${BACKEND_URL}/api/auth/status`, {
+          const res = await fetch(`/api/auth/status`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email: user.email })
@@ -81,7 +115,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
   }
 
   // Global Ban Enforcement: render BannedScreen for any protected route if status is BANNED
-  if (user && user.status === 'BANNED' && pathname !== '/login' && pathname !== '/register') {
+  if (!isAdminRoute && user && user.status === 'BANNED' && pathname !== '/login' && pathname !== '/register') {
     return <BannedScreen />;
   }
 

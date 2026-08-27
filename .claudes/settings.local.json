@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(where ollama *)",
+      "Bash(ollama --version)",
+      "Bash(npx tsc *)",
+      "Bash(npx eslint *)",
+      "Bash(node -c src/routes/noteRoutes.js)",
+      "Bash(node -c src/routes/ledgerRoutes.js)",
+      "Bash(node -c src/routes/udhaarRoutes.js)",
+      "Bash(node -c src/routes/reminderRoutes.js)",
+      "Bash(node -c src/controllers/noteController.js)",
+      "Bash(node -c src/controllers/syncController.js)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3000/inventory)",
+      "Bash(node \"C:\\\\Users\\\\M0695~1.MAN\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-m-mansoor-Desktop-my-bisiness-idea\\\\4c6dff01-d99a-4a88-bac2-6bfa99136581\\\\scratchpad\\\\walkthrough_variants.js\")",
+      "Bash(rm -f \"C:\\\\Users\\\\M0695~1.MAN\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-m-mansoor-Desktop-my-bisiness-idea\\\\4c6dff01-d99a-4a88-bac2-6bfa99136581\\\\scratchpad\"/variants*.png \"C:\\\\Users\\\\M0695~1.MAN\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-m-mansoor-Desktop-my-bisiness-idea\\\\4c6dff01-d99a-4a88-bac2-6bfa99136581\\\\scratchpad\"/walkthrough_variants.js \"C:\\\\Users\\\\M0695~1.MAN\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-m-mansoor-Desktop-my-bisiness-idea\\\\4c6dff01-d99a-4a88-bac2-6bfa99136581\\\\scratchpad\"/admin_dashboard_check.js \"C:\\\\Users\\\\M0695~1.MAN\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-m-mansoor-Desktop-my-bisiness-idea\\\\4c6dff01-d99a-4a88-bac2-6bfa99136581\\\\scratchpad\"/admin_login_debug.png 2>/dev/null; echo done)",
+      "Bash(mkdir -p \"c:/Users/m.mansoor/Desktop/my bisiness idea/nextjs-web-app/app/notes/[noteId]\")",
+      "Bash(node \"C:\\\\Users\\\\M0695~1.MAN\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-m-mansoor-Desktop-my-bisiness-idea\\\\4c6dff01-d99a-4a88-bac2-6bfa99136581\\\\scratchpad\\\\walkthrough_note_chat.js\")"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\M0695~1.MAN\\AppData\\Local\\Temp\\claude\\c--Users-m-mansoor-Desktop-my-bisiness-idea\\4c6dff01-d99a-4a88-bac2-6bfa99136581\\scratchpad",
+      "c:\\Users\\m.mansoor\\Desktop\\my bisiness idea\\nextjs-web-app\\app\\notes"
+    ]
+  }
+}

@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+/* The admin panel toggles dark mode via its own in-app switch (AdminThemeContext),
+   not the OS setting, so `dark:` utilities must key off a `.dark` class instead of
+   the default `prefers-color-scheme` media query. Only the admin section ever adds
+   this class (see AdminThemeContext.tsx) - the rest of the app doesn't use `dark:`. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -23,4 +29,28 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Referenced throughout the app (note cards, modals, page transitions) but never
+   actually defined anywhere - these have been silent no-ops until now. */
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in-up {
+  animation: fade-in-up 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-8px); }
+  40%, 80% { transform: translateX(8px); }
 }

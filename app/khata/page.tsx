@@ -1,15 +1,15 @@
-"use client";
+﻿"use client";
 
-import { useState, useMemo } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db, KhataCustomer, KhataTransaction } from '@/lib/db';
-import { 
+import { Sparkles, useState, useMemo } from 'react';
+import { Sparkles, useLiveQuery } from 'dexie-react-hooks';
+import { Sparkles, db, KhataCustomer, KhataTransaction } from '@/lib/db';
+import { Sparkles, 
   ArrowLeft, Plus, User as UserIcon, Phone, MapPin, Search, 
   MessageCircle, ArrowUpRight, ArrowDownLeft, X, Trash2, Printer, 
-  Store, Calendar, DollarSign, Filter, CheckCircle2, AlertCircle, RefreshCw 
+  Store, Calendar, DollarSign, Filter, CheckCircle2, AlertCircle, RefreshCw, Package
 } from 'lucide-react';
 import Link from 'next/link';
-import { useAuthStore } from '@/store/authStore';
+import { Sparkles, useAuthStore } from '@/store/authStore';
 
 export default function KhataPage() {
   const { shopModeEnabled, toggleShopMode } = useAuthStore();
@@ -25,16 +25,23 @@ export default function KhataPage() {
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [openingBalance, setOpeningBalance] = useState('0');
+  const [customerType, setCustomerType] = useState<'PERSON' | 'SHOP'>('PERSON');
+  const [customerLocationId, setCustomerLocationId] = useState('');
   
   const [txnAmount, setTxnAmount] = useState('');
   const [txnNote, setTxnNote] = useState('');
   const [txnType, setTxnType] = useState<'CREDIT' | 'DEBIT'>('CREDIT'); 
+  const [linkToInventory, setLinkToInventory] = useState(false);
+  const [selectedProductId, setSelectedProductId] = useState('');
+  const [selectedQuantity, setSelectedQuantity] = useState('1');
   // CREDIT = Credit Given / Udhaar Diya (Red)
   // DEBIT = Payment Received / Jama Kiye (Green)
 
   // Live queries from Dexie IndexedDB
   const customers = useLiveQuery(() => db.khataCustomers.filter(c => !c.isDeleted).toArray());
   const transactions = useLiveQuery(() => db.khataTransactions.filter(t => !t.isDeleted).toArray());
+  const products = useLiveQuery(() => db.products.filter(p => !p.isDeleted).toArray());
+  const locations = useLiveQuery(() => db.locations.filter((l) => l.isActive && !l.isDeleted).toArray());
 
   // DERIVED BALANCES: openingBalance + SUM(CREDIT) - SUM(DEBIT)
   const customerBalances = useMemo(() => {
@@ -131,15 +138,18 @@ export default function KhataPage() {
       if (t.type === 'CREDIT') runningBal += amt;
       else if (t.type === 'DEBIT') runningBal -= amt;
 
+      const linkedProduct = products?.find(p => p.syncId === t.productId);
+
       return {
         ...t,
-        runningBalance: runningBal
+        runningBalance: runningBal,
+        linkedProductName: linkedProduct ? linkedProduct.name : undefined
       };
     });
 
     // Reverse for UI display (newest first)
     return ledger.reverse();
-  }, [selectedCustomer, transactions]);
+  }, [selectedCustomer, transactions, products]);
 
   // HANDLERS
   const handleAddCustomer = async (e: React.FormEvent) => {
@@ -151,12 +161,14 @@ export default function KhataPage() {
       phone: phone.trim() || undefined,
       address: address.trim() || undefined,
       openingBalance: isNaN(Number(openingBalance)) ? 0 : Number(openingBalance),
+      customerType,
+      locationId: customerLocationId || undefined,
       createdAt: new Date(),
       updatedAt: new Date(),
       isDeleted: false
     });
 
-    setName(''); setPhone(''); setAddress(''); setOpeningBalance('0');
+    setName(''); setPhone(''); setAddress(''); setOpeningBalance('0'); setCustomerType('PERSON'); setCustomerLocationId('');
     setIsAddCustomerOpen(false);
   };
 
@@ -164,18 +176,38 @@ export default function KhataPage() {
     e.preventDefault();
     if (!selectedCustomer || !selectedCustomer.syncId || !txnAmount || isNaN(Number(txnAmount))) return;
 
-    await db.khataTransactions.add({
-      customerId: selectedCustomer.syncId,
-      type: txnType,
-      amount: Number(txnAmount),
-      note: txnNote.trim() || undefined,
-      date: new Date(),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      isDeleted: false
+    const qty = Number(selectedQuantity);
+    
+    await db.transaction('rw', db.khataTransactions, db.stockMovements, async () => {
+      await db.khataTransactions.add({
+        customerId: selectedCustomer.syncId!,
+        type: txnType,
+        amount: Number(txnAmount),
+        note: txnNote.trim() || undefined,
+        date: new Date(),
+        productId: linkToInventory && selectedProductId ? selectedProductId : undefined,
+        quantity: linkToInventory && selectedProductId ? qty : undefined,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        isDeleted: false
+      });
+
+      // If linking to inventory and it's Udhaar (CREDIT), auto-deduct stock
+      if (linkToInventory && selectedProductId && txnType === 'CREDIT') {
+        await db.stockMovements.add({
+          productId: selectedProductId,
+          type: 'STOCK_OUT',
+          quantity: qty,
+          reason: `Khata Udhaar - ${selectedCustomer.name}`,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          isDeleted: false
+        });
+      }
     });
 
     setTxnAmount(''); setTxnNote('');
+    setLinkToInventory(false); setSelectedProductId(''); setSelectedQuantity('1');
     setIsAddTxnOpen(false);
   };
 
@@ -282,7 +314,7 @@ export default function KhataPage() {
           <div className="bg-slate-800/60 border border-slate-700/60 rounded-2xl p-4 backdrop-blur-md">
             <span className="text-xs text-slate-400 font-medium block mb-1">Net Change Today</span>
             <span className={`text-2xl font-black ${dailySummary.netToday >= 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
-              Rs {Math.abs(dailySummary.netToday).toLocaleString()} {dailySummary.netToday >= 0 ? '(Credit ↑)' : '(Received ↓)'}
+              Rs {Math.abs(dailySummary.netToday).toLocaleString()} {dailySummary.netToday >= 0 ? '(Credit â†‘)' : '(Received â†“)'}
             </span>
           </div>
         </div>
@@ -353,11 +385,20 @@ export default function KhataPage() {
                       }`}
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center font-bold text-sm text-emerald-400 border border-slate-600">
-                          {c.name.charAt(0).toUpperCase()}
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm border ${
+                          c.customerType === 'SHOP' 
+                            ? 'bg-amber-600/20 text-amber-400 border-amber-500/30' 
+                            : 'bg-slate-700 text-emerald-400 border-slate-600'
+                        }`}>
+                          {c.customerType === 'SHOP' ? <Store className="w-5 h-5" /> : c.name.charAt(0).toUpperCase()}
                         </div>
                         <div>
-                          <h3 className="font-semibold text-sm text-slate-100">{c.name}</h3>
+                          <h3 className="font-semibold text-sm text-slate-100 flex items-center gap-1">
+                            {c.name}
+                            {c.customerType === 'SHOP' && (
+                              <span className="text-[9px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded-full border border-amber-500/20 uppercase">Shop</span>
+                            )}
+                          </h3>
                           {c.phone && <p className="text-xs text-slate-400 flex items-center gap-1"><Phone className="w-3 h-3" /> {c.phone}</p>}
                         </div>
                       </div>
@@ -382,11 +423,20 @@ export default function KhataPage() {
                 {/* Customer Detail Header */}
                 <div className="flex items-center justify-between pb-4 border-b border-slate-700/60 mb-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-2xl bg-emerald-600/20 border border-emerald-500/30 flex items-center justify-center font-bold text-lg text-emerald-400">
-                      {selectedCustomer.name.charAt(0).toUpperCase()}
+                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-lg border ${
+                      selectedCustomer.customerType === 'SHOP'
+                        ? 'bg-amber-600/20 border-amber-500/30 text-amber-400'
+                        : 'bg-emerald-600/20 border-emerald-500/30 text-emerald-400'
+                    }`}>
+                      {selectedCustomer.customerType === 'SHOP' ? <Store className="w-6 h-6" /> : selectedCustomer.name.charAt(0).toUpperCase()}
                     </div>
                     <div>
-                      <h2 className="text-lg font-bold text-white">{selectedCustomer.name}</h2>
+                      <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                        {selectedCustomer.name}
+                        {selectedCustomer.customerType === 'SHOP' && (
+                           <span className="text-[10px] bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full border border-amber-500/20 uppercase tracking-wider">Business / Shop</span>
+                        )}
+                      </h2>
                       <div className="flex items-center gap-3 text-xs text-slate-400">
                         {selectedCustomer.phone && <span className="flex items-center gap-1"><Phone className="w-3.5 h-3.5" /> {selectedCustomer.phone}</span>}
                         {selectedCustomer.address && <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> {selectedCustomer.address}</span>}
@@ -481,8 +531,13 @@ export default function KhataPage() {
                               {t.type === 'CREDIT' ? 'Credit Given (Udhaar)' : 'Payment Received (Jama)'}
                             </span>
                             <span className="text-[10px] text-slate-400">
-                              {new Date(t.date).toLocaleString()} {t.note ? `• ${t.note}` : ''}
+                              {new Date(t.date).toLocaleString()} {t.note ? `â€¢ ${t.note}` : ''}
                             </span>
+                            {t.linkedProductName && (
+                              <span className="text-[10px] bg-indigo-500/20 text-indigo-300 px-1.5 py-0.5 rounded-full flex items-center gap-1 w-fit mt-1">
+                                <Package className="w-3 h-3" /> {t.quantity}x {t.linkedProductName}
+                              </span>
+                            )}
                           </div>
                         </div>
 
@@ -528,6 +583,27 @@ export default function KhataPage() {
             </div>
 
             <form onSubmit={handleAddCustomer} className="space-y-3">
+              <div className="flex gap-2 mb-2">
+                <button
+                  type="button"
+                  onClick={() => setCustomerType('PERSON')}
+                  className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-colors flex items-center justify-center gap-1 ${
+                    customerType === 'PERSON' ? 'bg-indigo-500/20 text-indigo-400 border-indigo-500/40' : 'bg-slate-900 border-slate-700 text-slate-400 hover:bg-slate-800'
+                  }`}
+                >
+                  <UserIcon className="w-4 h-4" /> Person
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCustomerType('SHOP')}
+                  className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-colors flex items-center justify-center gap-1 ${
+                    customerType === 'SHOP' ? 'bg-indigo-500/20 text-indigo-400 border-indigo-500/40' : 'bg-slate-900 border-slate-700 text-slate-400 hover:bg-slate-800'
+                  }`}
+                >
+                  <Store className="w-4 h-4" /> Shop/Business
+                </button>
+              </div>
+
               <div>
                 <label className="text-xs text-slate-300 font-semibold block mb-1">Customer Name *</label>
                 <input 
@@ -564,7 +640,7 @@ export default function KhataPage() {
 
               <div>
                 <label className="text-xs text-slate-300 font-semibold block mb-1">Address / Location</label>
-                <textarea 
+                <textarea
                   rows={2}
                   placeholder="Shop # / Area..."
                   value={address}
@@ -572,6 +648,22 @@ export default function KhataPage() {
                   className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 resize-none"
                 />
               </div>
+
+              {locations && locations.length > 0 && (
+                <div>
+                  <label className="text-xs text-slate-300 font-semibold block mb-1">Branch / Location (for area analytics)</label>
+                  <select
+                    value={customerLocationId}
+                    onChange={(e) => setCustomerLocationId(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                  >
+                    <option value="">No location (unassigned)</option>
+                    {locations.map((l) => (
+                      <option key={l.syncId} value={l.syncId}>{l.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div className="flex gap-2 pt-2">
                 <button type="button" onClick={() => setIsAddCustomerOpen(false)} className="w-1/2 py-2 bg-slate-700 text-xs rounded-xl font-semibold text-slate-300">Cancel</button>
@@ -626,6 +718,58 @@ export default function KhataPage() {
                   className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
                 />
               </div>
+
+              {/* Link to Inventory Toggle */}
+              {products && products.length > 0 && (
+                <div className="pt-2 border-t border-slate-700">
+                  <label className="flex items-center gap-2 cursor-pointer mb-3">
+                    <input 
+                      type="checkbox"
+                      checked={linkToInventory}
+                      onChange={(e) => setLinkToInventory(e.target.checked)}
+                      className="w-4 h-4 rounded border-slate-700 text-indigo-500 focus:ring-indigo-500 bg-slate-900"
+                    />
+                    <span className="text-xs font-semibold text-indigo-300 flex items-center gap-1">
+                      <Package className="w-4 h-4" /> Link to Inventory Product
+                    </span>
+                  </label>
+
+                  {linkToInventory && (
+                    <div className="flex gap-2 animate-in slide-in-from-top-2 duration-200">
+                      <div className="flex-1">
+                        <label className="text-[10px] text-slate-400 block mb-1">Select Product</label>
+                        <select
+                          value={selectedProductId}
+                          onChange={(e) => setSelectedProductId(e.target.value)}
+                          required={linkToInventory}
+                          className="w-full bg-slate-900 border border-slate-700 rounded-xl px-2 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+                        >
+                          <option value="">-- Choose Product --</option>
+                          {products.map(p => (
+                            <option key={p.syncId} value={p.syncId}>{p.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="w-24">
+                        <label className="text-[10px] text-slate-400 block mb-1">Qty</label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={selectedQuantity}
+                          onChange={(e) => setSelectedQuantity(e.target.value)}
+                          required={linkToInventory}
+                          className="w-full bg-slate-900 border border-slate-700 rounded-xl px-2 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+                        />
+                      </div>
+                    </div>
+                  )}
+                  {linkToInventory && txnType === 'CREDIT' && (
+                    <p className="text-[10px] text-amber-400 mt-2 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3" /> Note: This will automatically deduct {selectedQuantity} qty from your inventory stock.
+                    </p>
+                  )}
+                </div>
+              )}
 
               <div className="flex gap-2 pt-2">
                 <button type="button" onClick={() => setIsAddTxnOpen(false)} className="w-1/2 py-2 bg-slate-700 text-xs rounded-xl font-semibold text-slate-300">Cancel</button>
@@ -734,3 +878,4 @@ export default function KhataPage() {
     </div>
   );
 }
+

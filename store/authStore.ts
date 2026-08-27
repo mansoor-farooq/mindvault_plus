@@ -7,12 +7,16 @@ interface AuthState {
   token: string | null;
   isUnlocked: boolean;
   shopModeEnabled: boolean;
+  // null = not fetched yet (treat everything as allowed to avoid flashing/hiding
+  // tools before the first fetch completes); an object = the merged access map.
+  featureAccess: Record<string, boolean> | null;
   login: (user: User, token?: string) => void;
   logout: () => void;
   unlock: () => void;
   lock: () => void;
   toggleShopMode: () => void;
   updateUser: (data: Partial<User>) => void;
+  setFeatureAccess: (access: Record<string, boolean>) => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -22,7 +26,8 @@ export const useAuthStore = create<AuthState>()(
       token: null,
       isUnlocked: false,
       shopModeEnabled: true,
-      login: (user, token) => set({ user, token: token || null, isUnlocked: true }), 
+      featureAccess: null,
+      login: (user, token) => set({ user, token: token || null, isUnlocked: true }),
       logout: () => {
         try {
           db.notes.clear();
@@ -35,12 +40,13 @@ export const useAuthStore = create<AuthState>()(
         } catch (e) {
           console.error('Failed to clear local DB on logout', e);
         }
-        set({ user: null, token: null, isUnlocked: false });
+        set({ user: null, token: null, isUnlocked: false, featureAccess: null });
       },
       unlock: () => set({ isUnlocked: true }),
       lock: () => set({ isUnlocked: false }),
       toggleShopMode: () => set((state) => ({ shopModeEnabled: !state.shopModeEnabled })),
       updateUser: (data) => set((state) => ({ user: state.user ? { ...state.user, ...data } : null })),
+      setFeatureAccess: (access) => set({ featureAccess: access }),
     }),
     {
       name: 'mindvault-auth',
