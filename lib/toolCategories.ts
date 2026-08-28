@@ -1,4 +1,4 @@
-﻿import { LucideIcon, Package, Sparkles, Calculator, LayoutGrid, Boxes, FolderTree, MapPin, BarChart3, MessageCircleQuestion, Gamepad2, Moon, HardDrive, Trash2, Mail, PieChart, Target, Radar, Users } from 'lucide-react';
+import { LucideIcon, Package, Sparkles, Calculator, LayoutGrid, Boxes, FolderTree, MapPin, BarChart3, MessageCircleQuestion, Gamepad2, Moon, HardDrive, Trash2, Mail, PieChart, Target, Radar, Users, Briefcase, UserCheck, Receipt, Presentation, PiggyBank, FileText } from 'lucide-react';
 import { User } from './db';
 
 export interface ToolCategoryItem {
@@ -25,6 +25,24 @@ export interface ToolCategory {
 // Category entity (lib/db.ts's Category interface). This just organizes the app's own
 // feature list for the home screen and category dashboard pages.
 export const TOOL_CATEGORIES: (ToolCategory & { tools: ToolCategoryItem[] })[] = [
+  {
+    id: 'erp-system',
+    label: 'ERP & Billing',
+    icon: Presentation,
+    colorClass: 'text-violet-600 bg-violet-50',
+    tools: [
+      { href: '/erp', icon: Receipt, label: 'POS & Analytics' },
+    ],
+  },
+  {
+    id: 'factory-hr',
+    label: 'Factory & Staff',
+    icon: Briefcase,
+    colorClass: 'text-indigo-600 bg-indigo-50',
+    tools: [
+      { href: '/staff', icon: UserCheck, label: 'Staff & Peshgi' },
+    ],
+  },
     ],
   },
   {
@@ -34,6 +52,7 @@ export const TOOL_CATEGORIES: (ToolCategory & { tools: ToolCategoryItem[] })[] =
     colorClass: 'text-emerald-600 bg-emerald-50',
     tools: [
       { href: '/budget', icon: Target, label: 'Monthly Budgets' },
+      { href: '/gulluck', icon: PiggyBank, label: 'Gulluck (Savings)' },
       { href: '/sale-alerts', icon: Radar, label: 'Sale Radar' },
     ],
   },
@@ -86,6 +105,10 @@ export const TOOL_CATEGORIES: (ToolCategory & { tools: ToolCategoryItem[] })[] =
 export function getToolCategory(id: string) {
   return TOOL_CATEGORIES.find((c) => c.id === id);
 }
+
+
+
+
 
 
 

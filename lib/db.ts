@@ -1,4 +1,4 @@
-﻿import Dexie, { type Table } from 'dexie';
+import Dexie, { type Table } from 'dexie';
 
 export interface User {
   id?: number;
@@ -49,6 +49,38 @@ export interface Budget {
   isDeleted: boolean;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface Employee {
+  id?: number;
+  syncId?: string;
+  name: string;
+  role: string; // e.g., 'Stitcher', 'Cutter', 'Helper', 'Manager'
+  phone: string;
+  baseSalary: number; // Monthly fixed salary
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface Attendance {
+  id?: number;
+  syncId?: string;
+  employeeId: string; // syncId of Employee
+  date: string; // YYYY-MM-DD
+  status: 'PRESENT' | 'ABSENT' | 'HALF_DAY';
+  createdAt: Date;
+}
+
+export interface Advance {
+  id?: number;
+  syncId?: string;
+  employeeId: string; // syncId of Employee
+  amount: number;
+  date: string; // YYYY-MM-DD
+  description: string;
+  isDeducted: boolean; // True when settled in monthly salary
+  createdAt: Date;
 }
 
 export interface Kameti {
@@ -249,6 +281,38 @@ export interface KhataTransaction {
   deletedAt?: Date;
 }
 
+export interface Gulluck {
+  id?: number;
+  syncId?: string;
+  name: string; // e.g., 'New iPhone 15'
+  targetAmount: number;
+  savedAmount: number;
+  createdAt: Date;
+}
+
+export interface InvoiceItem {
+  productId: string;
+  name: string;
+  quantity: number;
+  unitPrice: number;
+  total: number;
+}
+
+export interface Invoice {
+  id?: number;
+  syncId?: string;
+  invoiceNumber: string;
+  customerId?: string; // Links to KhataCustomer
+  customerName?: string;
+  items: InvoiceItem[];
+  subtotal: number;
+  discount: number;
+  total: number;
+  paymentMethod: 'CASH' | 'KHATA' | 'BANK';
+  date: Date;
+  createdAt: Date;
+}
+
 export interface Product {
   id?: number;
   syncId?: string;
@@ -345,6 +409,11 @@ export class MindVaultDB extends Dexie {
   saleSearchHistory!: Table<SaleSearchHistory>;
   kametis!: Table<Kameti>;
   kametiPayments!: Table<KametiPayment>;
+  employees!: Table<Employee>;
+  attendance!: Table<Attendance>;
+  advances!: Table<Advance>;
+  invoices!: Table<Invoice>;
+  gullucks!: Table<Gulluck>;
 
   constructor() {
     super('MindVaultDB');
@@ -630,6 +699,20 @@ export class MindVaultDB extends Dexie {
       kametiPayments: '++id, syncId, kametiId, memberName, monthNumber, isPaid'
     });
 
+    this.version(20).stores({
+      employees: '++id, syncId, name, isActive',
+      attendance: '++id, syncId, employeeId, date, status',
+      advances: '++id, syncId, employeeId, date, isDeducted'
+    });
+
+    this.version(21).stores({
+      invoices: '++id, syncId, invoiceNumber, customerId, date'
+    });
+
+    this.version(22).stores({
+      gullucks: '++id, syncId, name'
+    });
+
     // Automatically generate syncId for new records
     const generateUUID = () => {
       if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -658,6 +741,11 @@ export class MindVaultDB extends Dexie {
     applySyncIdHook(this.saleSearchHistory);
     applySyncIdHook(this.kametis);
     applySyncIdHook(this.kametiPayments);
+    applySyncIdHook(this.employees);
+    applySyncIdHook(this.attendance);
+    applySyncIdHook(this.advances);
+    applySyncIdHook(this.invoices);
+    applySyncIdHook(this.gullucks);
     applySyncIdHook(this.reminders);
     applySyncIdHook(this.bills);
     applySyncIdHook(this.khataCustomers);
@@ -672,6 +760,9 @@ export class MindVaultDB extends Dexie {
 }
 
 export const db = new MindVaultDB();
+
+
+
 
 
 
