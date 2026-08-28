@@ -281,6 +281,37 @@ export interface KhataTransaction {
   deletedAt?: Date;
 }
 
+export interface Vendor {
+  id?: number;
+  syncId?: string;
+  name: string;
+  companyName: string;
+  phone: string;
+  openingBalance: number; // Positive means we owe them
+  createdAt: Date;
+}
+
+export interface PurchaseItem {
+  productId?: string;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  total: number;
+}
+
+export interface PurchaseOrder {
+  id?: number;
+  syncId?: string;
+  vendorId: string;
+  poNumber: string;
+  date: Date;
+  items: PurchaseItem[];
+  totalAmount: number;
+  amountPaid: number; // If amountPaid < totalAmount, it adds to vendor balance
+  status: 'PENDING' | 'COMPLETED';
+  createdAt: Date;
+}
+
 export interface Gulluck {
   id?: number;
   syncId?: string;
@@ -414,6 +445,8 @@ export class MindVaultDB extends Dexie {
   advances!: Table<Advance>;
   invoices!: Table<Invoice>;
   gullucks!: Table<Gulluck>;
+  vendors!: Table<Vendor>;
+  purchaseOrders!: Table<PurchaseOrder>;
 
   constructor() {
     super('MindVaultDB');
@@ -713,6 +746,11 @@ export class MindVaultDB extends Dexie {
       gullucks: '++id, syncId, name'
     });
 
+    this.version(23).stores({
+      vendors: '++id, syncId, name',
+      purchaseOrders: '++id, syncId, vendorId, poNumber'
+    });
+
     // Automatically generate syncId for new records
     const generateUUID = () => {
       if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -746,6 +784,8 @@ export class MindVaultDB extends Dexie {
     applySyncIdHook(this.advances);
     applySyncIdHook(this.invoices);
     applySyncIdHook(this.gullucks);
+    applySyncIdHook(this.vendors);
+    applySyncIdHook(this.purchaseOrders);
     applySyncIdHook(this.reminders);
     applySyncIdHook(this.bills);
     applySyncIdHook(this.khataCustomers);
@@ -760,6 +800,7 @@ export class MindVaultDB extends Dexie {
 }
 
 export const db = new MindVaultDB();
+
 
 
 

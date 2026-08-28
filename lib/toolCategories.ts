@@ -1,4 +1,4 @@
-import { LucideIcon, Package, Sparkles, Calculator, LayoutGrid, Boxes, FolderTree, MapPin, BarChart3, MessageCircleQuestion, Gamepad2, Moon, HardDrive, Trash2, Mail, PieChart, Target, Radar, Users, Briefcase, UserCheck, Receipt, Presentation, PiggyBank, FileText } from 'lucide-react';
+import { LucideIcon, Package, Sparkles, Calculator, LayoutGrid, Boxes, FolderTree, MapPin, BarChart3, MessageCircleQuestion, Gamepad2, Moon, HardDrive, Trash2, Mail, PieChart, Target, Radar, Users, Briefcase, UserCheck, Receipt, Presentation, PiggyBank, FileText, Truck } from 'lucide-react';
 import { User } from './db';
 
 export interface ToolCategoryItem {
@@ -32,6 +32,8 @@ export const TOOL_CATEGORIES: (ToolCategory & { tools: ToolCategoryItem[] })[] =
     colorClass: 'text-violet-600 bg-violet-50',
     tools: [
       { href: '/erp', icon: Receipt, label: 'POS & Analytics' },
+      { href: '/vendors', icon: Truck, label: 'Suppliers & Purchases' },
+      { href: '/quotes', icon: FileText, label: 'Quotation Builder' },
     ],
   },
   {
@@ -105,6 +107,8 @@ export const TOOL_CATEGORIES: (ToolCategory & { tools: ToolCategoryItem[] })[] =
 export function getToolCategory(id: string) {
   return TOOL_CATEGORIES.find((c) => c.id === id);
 }
+
+
 
 
 

@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
-import { Home, Wallet, Store, Settings, LogOut, Sparkles, Presentation, Briefcase, Calculator, Users, PieChart, Package, Radar, PiggyBank, FileText } from 'lucide-react';
+import { Home, Wallet, Store, Settings, LogOut, Sparkles, Presentation, Briefcase, Calculator, Users, PieChart, Package, Radar, PiggyBank, FileText, Truck } from 'lucide-react';
 
 export default function AppSidebar({ isMobile = false, onClose }: { isMobile?: boolean, onClose?: () => void }) {
   const pathname = usePathname();
@@ -26,6 +26,8 @@ export default function AppSidebar({ isMobile = false, onClose }: { isMobile?: b
       title: 'BUSINESS & SALES',
       links: [
         { href: '/erp', icon: Presentation, label: 'ERP & Billing' },
+        { href: '/quotes', icon: FileText, label: 'Quotation / Estimate' },
+        { href: '/vendors', icon: Truck, label: 'Suppliers (Purchases)' },
         { href: '/khata', icon: Store, label: 'Customer Khata' },
         { href: '/inventory', icon: Package, label: 'Inventory' },
       ]
@@ -94,5 +96,7 @@ export default function AppSidebar({ isMobile = false, onClose }: { isMobile?: b
     </aside>
   );
 }
+
+
 
 
