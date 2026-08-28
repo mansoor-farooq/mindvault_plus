@@ -1,7 +1,7 @@
-import { NextResponse } from 'next/server';
+﻿import { NextResponse } from 'next/server';
 import { db } from '../db.server';
 import { gatingService } from './gatingService';
-import { AI_FREE_LIMITS } from '../config/aiConfig';
+import { AI_TIER_LIMITS } from '../config/aiConfig';
 
 export async function getUserLicense(userId: number) {
   const result = await db.query('SELECT license_type, license_expiry FROM users WHERE id = $1', [userId]);
@@ -19,9 +19,10 @@ export function localeContext(locale?: string): string {
 
 export async function enforceQuota(userId: number, featureKey: string): Promise<NextResponse | null> {
   const user = await getUserLicense(userId);
-  const quota = await gatingService.checkAndConsumeDailyQuota(userId, user.license_type, featureKey, AI_FREE_LIMITS[featureKey], user.license_expiry);
+  const quota = await gatingService.checkAndConsumeDailyQuota(userId, user.license_type, featureKey, 0 /* Looked up inside gatingService */, user.license_expiry);
   if (!quota.allowed) {
     return NextResponse.json({ error: 'AI_LIMIT_REACHED', feature: featureKey }, { status: 403 });
   }
   return null;
 }
+

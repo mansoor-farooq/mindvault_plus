@@ -1,5 +1,6 @@
-import { db } from '../db.server';
+﻿import { db } from '../db.server';
 import { FREE_LIMITS } from '../config/gatingConfig';
+import { AI_TIER_LIMITS, PlanTier } from '../config/aiConfig';
 
 interface CheckLimitResult {
   allowed: boolean;
@@ -67,11 +68,21 @@ class GatingService {
    * unlike row-count features like khata_customers). Resets at UTC midnight.
    * Additive to checkLimit - does not touch the row-count path used above.
    */
-  async checkAndConsumeDailyQuota(userId: number, licenseType: string, featureKey: string, dailyLimit: number, licenseExpiry: string | Date | null = null): Promise<CheckQuotaResult> {
-    const isExpiredPro = licenseType === 'PRO' && licenseExpiry && new Date(licenseExpiry) < new Date();
-    if ((licenseType === 'PRO' && !isExpiredPro) || licenseType === 'LIFETIME') {
-      return { allowed: true, remaining: Infinity };
+  async checkAndConsumeDailyQuota(userId: number, licenseType: string, featureKey: string, unusedOldLimit: number, licenseExpiry: string | Date | null = null): Promise<CheckQuotaResult> {
+    const isExpired = licenseExpiry && new Date(licenseExpiry) < new Date();
+    
+    // Map licenseType to our structured PlanTier
+    let tier: PlanTier = 'FREE';
+    if (!isExpired) {
+      if (licenseType === 'UNLIMITED' || licenseType === 'LIFETIME') tier = 'UNLIMITED';
+      else if (licenseType === 'PRO_PLUS') tier = 'PRO_PLUS';
+      else if (licenseType === 'PRO') tier = 'PRO';
     }
+
+    if (tier === 'UNLIMITED') return { allowed: true, remaining: Infinity };
+
+    // Get the dynamic limit based on the user's tier
+    const dailyLimit = AI_TIER_LIMITS[tier][featureKey] || 0;
 
     // Single atomic UPSERT using Postgres's own CURRENT_DATE (not a JS-computed
     // date string) so the "is this still today" check never drifts between the
@@ -98,3 +109,4 @@ class GatingService {
 }
 
 export const gatingService = new GatingService();
+

@@ -4,12 +4,14 @@ import { useState } from 'react';
 import { usePathname } from 'next/navigation';
 import AppSidebar from './AppSidebar';
 import { Menu, Sparkles, Bell } from 'lucide-react';
+import AICopilot from './AICopilot';
 
 const EXCLUDED_PREFIXES = ['/admin', '/login', '/register', '/lock'];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const user = useAuthStore(s => s.user);
   const isExcluded = EXCLUDED_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + '/'));
 
   if (isExcluded) {
@@ -59,8 +61,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <Bell className="w-5 h-5" />
               <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full border border-white"></span>
             </button>
-            <div className="w-9 h-9 rounded-full bg-indigo-100 border border-indigo-200 flex items-center justify-center text-indigo-700 font-bold text-sm">
-              AD
+            <div className="flex items-center gap-2">
+              <div className="text-right hidden sm:block">
+                <p className="text-sm font-bold text-slate-800 leading-tight">{user?.fullName || 'Admin'}</p>
+                <p className="text-[10px] font-bold text-slate-400 uppercase">{user?.role || 'OWNER'}</p>
+              </div>
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-100 to-violet-100 border border-indigo-200 flex items-center justify-center text-indigo-700 font-black text-sm shadow-sm">
+                {(user?.fullName || 'AD').substring(0, 2).toUpperCase()}
+              </div>
             </div>
           </div>
         </header>
@@ -69,7 +77,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <div className="flex-1 overflow-auto bg-slate-50">
           {children}
         </div>
+        <AICopilot />
       </div>
     </div>
   );
 }
+
+

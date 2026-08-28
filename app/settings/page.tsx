@@ -1,10 +1,10 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import { db } from '@/lib/db';
-import { ArrowLeft, HardDrive, Loader2, CheckCircle2, AlertTriangle, CloudUpload, Unlink, Building2, Save, Users } from 'lucide-react';
+import { ArrowLeft, HardDrive, Loader2, CheckCircle2, AlertTriangle, CloudUpload, Unlink, Building2, Save, Users, Rocket } from 'lucide-react';
 import Link from 'next/link';
 
 interface DriveStatus {
@@ -259,3 +259,5 @@ function SettingsPageInner() {
     </main>
   );
 }
+
+

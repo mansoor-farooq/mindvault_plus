@@ -1,13 +1,15 @@
-import Dexie, { type Table } from 'dexie';
+﻿import Dexie, { type Table } from 'dexie';
 
 export interface User {
+  companyCode?: string; // Tenant Isolation ID
   id?: number;
   fullName: string;
   email: string;
   passwordHash: string; // Stored securely if needed locally, though mostly backend
   pin?: string;         // Local app lock PIN (hashed)
   status?: 'ACTIVE' | 'BANNED';
-  license?: 'FREE' | 'PRO' | 'LIFETIME';
+  companyCode?: string; // Multi-Tenant SaaS Tenant ID
+  license?: 'FREE' | 'PRO' | 'PRO_PLUS' | 'UNLIMITED';
   country?: string;
   city?: string;
   religion?: 'muslim' | 'other' | 'prefer_not_to_say';
@@ -20,6 +22,7 @@ export interface User {
 }
 
 export interface Note {
+  companyCode?: string; // Tenant Isolation ID
   id?: number;
   syncId?: string;
   title: string;
@@ -41,6 +44,7 @@ export interface Note {
 }
 
 export interface Budget {
+  companyCode?: string; // Tenant Isolation ID
   id?: number;
   syncId?: string;
   category: string;
@@ -52,6 +56,7 @@ export interface Budget {
 }
 
 export interface Employee {
+  companyCode?: string; // Tenant Isolation ID
   id?: number;
   syncId?: string;
   name: string;
@@ -64,6 +69,7 @@ export interface Employee {
 }
 
 export interface Attendance {
+  companyCode?: string; // Tenant Isolation ID
   id?: number;
   syncId?: string;
   employeeId: string; // syncId of Employee
@@ -73,6 +79,7 @@ export interface Attendance {
 }
 
 export interface Advance {
+  companyCode?: string; // Tenant Isolation ID
   id?: number;
   syncId?: string;
   employeeId: string; // syncId of Employee
@@ -84,6 +91,7 @@ export interface Advance {
 }
 
 export interface Kameti {
+  companyCode?: string; // Tenant Isolation ID
   id?: number;
   syncId?: string;
   name: string;
@@ -96,6 +104,7 @@ export interface Kameti {
 }
 
 export interface KametiPayment {
+  companyCode?: string; // Tenant Isolation ID
   id?: number;
   syncId?: string;
   kametiId: string; // syncId of the Kameti
@@ -106,6 +115,7 @@ export interface KametiPayment {
 }
 
 export interface SaleSearchHistory {
+  companyCode?: string; // Tenant Isolation ID
   id?: number;
   syncId?: string;
   latitude: number;
@@ -117,6 +127,7 @@ export interface SaleSearchHistory {
 }
 
 export interface ChatMessage {
+  companyCode?: string; // Tenant Isolation ID
   id?: number;
   syncId?: string;
   noteId: string; // Refers to Note.syncId (mandatory FK)
@@ -126,6 +137,7 @@ export interface ChatMessage {
 }
 
 export interface Document {
+  companyCode?: string; // Tenant Isolation ID
   id?: number;
   syncId?: string;
   noteId: string; // Refers to Note.syncId (UUID)
@@ -142,6 +154,7 @@ export interface Document {
 }
 
 export interface Annotation {
+  companyCode?: string; // Tenant Isolation ID
   id?: number;
   syncId?: string;
   documentId: string; // Refers to Document.syncId (UUID)
@@ -152,6 +165,7 @@ export interface Annotation {
 }
 
 export interface LedgerEntry {
+  companyCode?: string; // Tenant Isolation ID
   id?: number;
   syncId?: string;
   type: 'INCOME' | 'EXPENSE';
@@ -169,6 +183,7 @@ export interface LedgerEntry {
 }
 
 export interface UdhaarPayment {
+  companyCode?: string; // Tenant Isolation ID
   id: string; // unique string, e.g., Date.now().toString()
   amount: number;
   date: Date;
@@ -178,6 +193,7 @@ export interface UdhaarPayment {
 }
 
 export interface Udhaar {
+  companyCode?: string; // Tenant Isolation ID
   id?: number;
   syncId?: string;
   personName: string;
@@ -194,6 +210,7 @@ export interface Udhaar {
 }
 
 export interface Reminder {
+  companyCode?: string; // Tenant Isolation ID
   id?: number;
   syncId?: string;
   noteId: string; // Refers to Note.syncId (UUID)
@@ -203,11 +220,13 @@ export interface Reminder {
 }
 
 export interface SyncStatus {
+  companyCode?: string; // Tenant Isolation ID
   id?: number;
   lastSyncAt: Date;
 }
 
 export interface Bill {
+  companyCode?: string; // Tenant Isolation ID
   id?: string;
   syncId?: string;
   title: string;
@@ -223,6 +242,7 @@ export interface Bill {
 }
 
 export interface KhataCustomer {
+  companyCode?: string; // Tenant Isolation ID
   id?: number;
   syncId?: string;
   name: string;
@@ -238,6 +258,7 @@ export interface KhataCustomer {
 }
 
 export interface Location {
+  companyCode?: string; // Tenant Isolation ID
   id?: number;
   syncId?: string;
   name: string;
@@ -253,6 +274,7 @@ export interface Location {
 }
 
 export interface Category {
+  companyCode?: string; // Tenant Isolation ID
   id?: number;
   syncId?: string;
   name: string;
@@ -266,6 +288,7 @@ export interface Category {
 }
 
 export interface KhataTransaction {
+  companyCode?: string; // Tenant Isolation ID
   id?: number;
   syncId?: string;
   customerId: string; // Refers to KhataCustomer.syncId
@@ -282,6 +305,7 @@ export interface KhataTransaction {
 }
 
 export interface Vendor {
+  companyCode?: string; // Tenant Isolation ID
   id?: number;
   syncId?: string;
   name: string;
@@ -292,6 +316,7 @@ export interface Vendor {
 }
 
 export interface PurchaseItem {
+  companyCode?: string; // Tenant Isolation ID
   productId?: string;
   description: string;
   quantity: number;
@@ -300,6 +325,7 @@ export interface PurchaseItem {
 }
 
 export interface PurchaseOrder {
+  companyCode?: string; // Tenant Isolation ID
   id?: number;
   syncId?: string;
   vendorId: string;
@@ -313,6 +339,7 @@ export interface PurchaseOrder {
 }
 
 export interface Gulluck {
+  companyCode?: string; // Tenant Isolation ID
   id?: number;
   syncId?: string;
   name: string; // e.g., 'New iPhone 15'
@@ -322,6 +349,7 @@ export interface Gulluck {
 }
 
 export interface InvoiceItem {
+  companyCode?: string; // Tenant Isolation ID
   productId: string;
   name: string;
   quantity: number;
@@ -330,6 +358,7 @@ export interface InvoiceItem {
 }
 
 export interface Invoice {
+  companyCode?: string; // Tenant Isolation ID
   id?: number;
   syncId?: string;
   invoiceNumber: string;
@@ -344,7 +373,17 @@ export interface Invoice {
   createdAt: Date;
 }
 
+export interface PdfTemplate {
+  id?: number;
+  companyCode?: string;
+  syncId?: string;
+  name: string;
+  elementsData: string; // JSON string of the CanvasElement[]
+  createdAt: string;
+}
+
 export interface Product {
+  companyCode?: string; // Tenant Isolation ID
   id?: number;
   syncId?: string;
   sku: string;
@@ -378,6 +417,7 @@ export interface Product {
 }
 
 export interface ProductVariant {
+  companyCode?: string; // Tenant Isolation ID
   id?: number;
   syncId?: string;
   productId: string; // Refers to Product.syncId (mandatory)
@@ -392,6 +432,7 @@ export interface ProductVariant {
 }
 
 export interface StockMovement {
+  companyCode?: string; // Tenant Isolation ID
   id?: number;
   syncId?: string;
   productId: string; // Refers to Product.syncId
@@ -409,6 +450,7 @@ export interface StockMovement {
 }
 
 export interface FeatureUsage {
+  companyCode?: string; // Tenant Isolation ID
   id?: number;
   featureKey: string;
   usedCount: number;
@@ -430,6 +472,7 @@ export class MindVaultDB extends Dexie {
   khataCustomers!: Table<KhataCustomer>;
   khataTransactions!: Table<KhataTransaction>;
   products!: Table<Product>;
+  pdfTemplates!: Table<PdfTemplate>;
   stockMovements!: Table<StockMovement>;
   featureUsage!: Table<FeatureUsage>;
   locations!: Table<Location>;
@@ -751,6 +794,28 @@ export class MindVaultDB extends Dexie {
       purchaseOrders: '++id, syncId, vendorId, poNumber'
     });
 
+    this.version(25).stores({
+      notes: '++id, companyCode, syncId, category, isPinned',
+      ledgerEntries: '++id, companyCode, syncId, type, date',
+      budgets: '++id, companyCode, syncId, month',
+      saleSearchHistory: '++id, companyCode, syncId, timestamp',
+      kametis: '++id, companyCode, syncId, status',
+      kametiPayments: '++id, companyCode, syncId, kametiId, memberId, monthIndex',
+      employees: '++id, companyCode, syncId, isActive',
+      attendance: '++id, companyCode, syncId, employeeId, date',
+      advances: '++id, companyCode, syncId, employeeId, isDeducted',
+      vendors: '++id, companyCode, syncId, name',
+      purchaseOrders: '++id, companyCode, syncId, vendorId, poNumber',
+      invoices: '++id, companyCode, syncId, invoiceNumber, customerId, date',
+      khataCustomers: '++id, companyCode, syncId',
+      khataTransactions: '++id, companyCode, syncId, customerId, date',
+      products: '++id, companyCode, syncId, categoryId',
+      productVariants: '++id, companyCode, syncId, productId',
+      stockMovements: '++id, companyCode, syncId, productId, type, date',
+      featureUsage: '++id, companyCode, syncId, featureKey',
+      pdfTemplates: '++id, companyCode, syncId, name',
+    });
+    
     // Automatically generate syncId for new records
     const generateUUID = () => {
       if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -762,7 +827,7 @@ export class MindVaultDB extends Dexie {
       });
     };
 
-    const applySyncIdHook = (table: Table) => {
+    const applyTenantHooks = (table: Table) => {
       table.hook('creating', function (primKey, obj, trans) {
         if (!obj.syncId) {
           obj.syncId = generateUUID();
@@ -770,36 +835,43 @@ export class MindVaultDB extends Dexie {
       });
     };
 
-    applySyncIdHook(this.notes);
-    applySyncIdHook(this.documents);
-    applySyncIdHook(this.annotations);
-    applySyncIdHook(this.ledgerEntries);
-    applySyncIdHook(this.udhaar);
-    applySyncIdHook(this.budgets);
-    applySyncIdHook(this.saleSearchHistory);
-    applySyncIdHook(this.kametis);
-    applySyncIdHook(this.kametiPayments);
-    applySyncIdHook(this.employees);
-    applySyncIdHook(this.attendance);
-    applySyncIdHook(this.advances);
-    applySyncIdHook(this.invoices);
-    applySyncIdHook(this.gullucks);
-    applySyncIdHook(this.vendors);
-    applySyncIdHook(this.purchaseOrders);
-    applySyncIdHook(this.reminders);
-    applySyncIdHook(this.bills);
-    applySyncIdHook(this.khataCustomers);
-    applySyncIdHook(this.khataTransactions);
-    applySyncIdHook(this.products);
-    applySyncIdHook(this.stockMovements);
-    applySyncIdHook(this.locations);
-    applySyncIdHook(this.categories);
-    applySyncIdHook(this.productVariants);
-    applySyncIdHook(this.chatMessages);
+    applyTenantHooks(this.notes);
+    applyTenantHooks(this.documents);
+    applyTenantHooks(this.annotations);
+    applyTenantHooks(this.ledgerEntries);
+    applyTenantHooks(this.udhaar);
+    applyTenantHooks(this.budgets);
+    applyTenantHooks(this.saleSearchHistory);
+    applyTenantHooks(this.kametis);
+    applyTenantHooks(this.kametiPayments);
+    applyTenantHooks(this.employees);
+    applyTenantHooks(this.attendance);
+    applyTenantHooks(this.advances);
+    applyTenantHooks(this.invoices);
+    applyTenantHooks(this.gullucks);
+    applyTenantHooks(this.vendors);
+    applyTenantHooks(this.purchaseOrders);
+    applyTenantHooks(this.reminders);
+    applyTenantHooks(this.bills);
+    applyTenantHooks(this.khataCustomers);
+    applyTenantHooks(this.khataTransactions);
+    applyTenantHooks(this.products);
+    applyTenantHooks(this.stockMovements);
+    applyTenantHooks(this.locations);
+    applyTenantHooks(this.categories);
+    applyTenantHooks(this.productVariants);
+    applyTenantHooks(this.chatMessages);
   }
 }
 
 export const db = new MindVaultDB();
+
+
+
+
+
+
+
 
 
 
