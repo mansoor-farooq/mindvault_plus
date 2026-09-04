@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { UdhaarModel } from '../../../../../lib/models/udhaarModel';
-import { requireAuth } from '../../../../../lib/auth/jwtAuth';
+import { requireModuleAccess } from '../../../../../lib/auth/moduleGate';
 
 export async function GET(req: NextRequest) {
-  const auth = await requireAuth(req);
-  if (!auth.ok) {
-    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  const gate = await requireModuleAccess(req, 'khata', 'view');
+  if (!gate.ok) {
+    return gate.response;
   }
 
   try {
-    const udhaars = await UdhaarModel.findByUserId(auth.user.id);
+    const udhaars = await UdhaarModel.findByUserId(gate.user.id);
     return NextResponse.json({ udhaars });
   } catch (error) {
     console.error(error);

@@ -1,17 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ReminderModel } from '../../../lib/models/reminderModel';
-import { requireAuth } from '../../../lib/auth/jwtAuth';
+import { requireModuleAccess } from '../../../lib/auth/moduleGate';
 
 export async function POST(req: NextRequest) {
-  const auth = await requireAuth(req);
-  if (!auth.ok) {
-    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  const gate = await requireModuleAccess(req, 'tools', 'full');
+  if (!gate.ok) {
+    return gate.response;
   }
 
   try {
     const { note_id, reminder_type, date_time } = await req.json();
 
-    const reminder = await ReminderModel.create({ note_id, reminder_type, date_time, user_id: auth.user.id });
+    const reminder = await ReminderModel.create({ note_id, reminder_type, date_time, user_id: gate.user.id });
     if (!reminder) {
       return NextResponse.json({ error: 'Note not found' }, { status: 404 });
     }

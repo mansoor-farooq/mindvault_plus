@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -41,7 +41,7 @@ export default function VoiceNotePage() {
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60).toString().padStart(2, '0');
     const s = (seconds % 60).toString().padStart(2, '0');
-    return ${m}:;
+    return `${m}:${s}`;
   };
 
   const startRecording = async () => {
@@ -97,7 +97,7 @@ export default function VoiceNotePage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: Bearer  + token,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           audioBase64: base64Audio,
@@ -143,7 +143,7 @@ export default function VoiceNotePage() {
         title: transcriptionData.title,
         description: transcriptionData.transcript + (transcriptionData.actionItems?.length ? '\n\nAction Items:\n- ' + transcriptionData.actionItems.join('\n- ') : ''),
         summary: transcriptionData.summary,
-        category: 'Personal', // Default category
+        category: 'Personal',
         tags: transcriptionData.tags,
         isFavorite: false,
         isDeleted: false,
@@ -160,7 +160,7 @@ export default function VoiceNotePage() {
 
   return (
     <main className="flex-1 flex flex-col bg-gray-50 min-h-screen">
-      <header className="bg-gradient-to-r from-indigo-600 to-violet-600 text-white p-4 flex items-center justify-between shadow-lg shadow-indigo-200/50 sticky top-0 z-10">
+      <div className="bg-gradient-to-r from-indigo-600 to-violet-600 text-white p-4 flex items-center justify-between shadow-lg shadow-indigo-200/50 shrink-0">
         <div className="flex items-center gap-3">
           <Link href="/" className="p-2 hover:bg-white/15 rounded-full transition-colors">
             <ArrowLeft className="w-6 h-6 text-white" />
@@ -169,7 +169,7 @@ export default function VoiceNotePage() {
             <Mic className="w-5 h-5" /> Voice Note
           </h1>
         </div>
-      </header>
+      </div>
 
       <div className="flex-1 p-4 max-w-2xl w-full mx-auto flex flex-col gap-6">
         
@@ -184,8 +184,10 @@ export default function VoiceNotePage() {
         {/* Recording Interface */}
         {!transcriptionData && !isTranscribing && (
           <div className="flex flex-col items-center justify-center py-12 gap-8">
-            <div className={w-32 h-32 rounded-full flex items-center justify-center transition-all duration-300 }>
-              <Mic className={w-12 h-12 } />
+            <div className={`w-32 h-32 rounded-full flex items-center justify-center transition-all duration-300 ${
+              isRecording ? 'bg-rose-100 animate-pulse text-rose-600 ring-8 ring-rose-50' : 'bg-indigo-50 text-indigo-600'
+            }`}>
+              <Mic className={`w-12 h-12 ${isRecording ? 'animate-bounce' : ''}`} />
             </div>
             
             <div className="text-center">
@@ -199,7 +201,9 @@ export default function VoiceNotePage() {
 
             <button
               onClick={isRecording ? stopRecording : startRecording}
-              className={px-8 py-4 rounded-full font-bold text-white flex items-center gap-2 transition-transform active:scale-95 shadow-lg }
+              className={`px-8 py-4 rounded-full font-bold text-white flex items-center gap-2 transition-transform active:scale-95 shadow-lg ${
+                isRecording ? 'bg-rose-600 hover:bg-rose-700 shadow-rose-200' : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200'
+              }`}
             >
               {isRecording ? (
                 <><Square className="w-5 h-5 fill-current" /> Stop & Process</>

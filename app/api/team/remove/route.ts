@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '../../../../lib/db.server';
-import { requireAuth } from '../../../../lib/auth/jwtAuth';
+import { requireOwner } from '../../../../lib/auth/moduleGate';
 
 export async function POST(req: NextRequest) {
-  const auth = await requireAuth(req);
-  if (!auth.ok) {
-    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  const ownerAuth = await requireOwner(req);
+  if (!ownerAuth.ok) {
+    return ownerAuth.response;
   }
 
   const { userId } = await req.json();
@@ -14,10 +14,10 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const callerRow = await db.query('SELECT org_role, organization_id FROM users WHERE id = $1', [auth.user.actualUserId]);
+    const callerRow = await db.query('SELECT org_role, organization_id FROM users WHERE id = $1', [ownerAuth.actualUserId]);
     const caller = callerRow.rows[0];
-    if (!caller?.organization_id || caller.org_role !== 'OWNER') {
-      return NextResponse.json({ error: 'Only the organization owner can remove team members' }, { status: 403 });
+    if (!caller?.organization_id) {
+      return NextResponse.json({ error: 'Organization not found' }, { status: 403 });
     }
 
     // Ownership check: the target must actually belong to the caller's own organization,

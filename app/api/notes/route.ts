@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { NoteModel } from '../../../lib/models/noteModel';
 import { DocumentModel } from '../../../lib/models/documentModel';
-import { requireAuth } from '../../../lib/auth/jwtAuth';
+import { requireModuleAccess } from '../../../lib/auth/moduleGate';
 
 export async function POST(req: NextRequest) {
-  const auth = await requireAuth(req);
-  if (!auth.ok) {
-    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  const gate = await requireModuleAccess(req, 'notes_ai', 'full');
+  if (!gate.ok) {
+    return gate.response;
   }
 
   try {
-    const user_id = auth.user.id;
+    const user_id = gate.user.id;
     const { title, description, type, category, tags, reminder_date_time, document_details } = await req.json();
     // document_details would include file_name, file_path, folder, total_pages, cover_thumbnail
 

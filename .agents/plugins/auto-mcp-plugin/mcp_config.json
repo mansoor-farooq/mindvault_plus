@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "my-auto-mcp": {
+      "command": "node",
+      "args": ["c:/Users/m.mansoor/Desktop/my bisiness idea/nextjs-web-app/my-custom-mcp/index.js"]
+    },
+    "ruflo-mcp": {
+      "command": "ruflo.cmd",
+      "args": ["mcp", "start"]
+    }
+  }
+}

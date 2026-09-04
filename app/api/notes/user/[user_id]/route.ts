@@ -1,17 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { NoteModel } from '../../../../../lib/models/noteModel';
-import { requireAuth } from '../../../../../lib/auth/jwtAuth';
+import { requireModuleAccess } from '../../../../../lib/auth/moduleGate';
 
 export async function GET(req: NextRequest) {
-  const auth = await requireAuth(req);
-  if (!auth.ok) {
-    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  const gate = await requireModuleAccess(req, 'notes_ai', 'view');
+  if (!gate.ok) {
+    return gate.response;
   }
 
   try {
     // Ownership is derived from the authenticated token, never from the URL param,
     // so one user can never enumerate another user's notes by changing :user_id.
-    const notes = await NoteModel.findByUserId(auth.user.id);
+    const notes = await NoteModel.findByUserId(gate.user.id);
     return NextResponse.json({ notes });
   } catch (error) {
     console.error(error);

@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { UdhaarModel } from '../../../lib/models/udhaarModel';
-import { requireAuth } from '../../../lib/auth/jwtAuth';
+import { requireModuleAccess } from '../../../lib/auth/moduleGate';
 
 export async function POST(req: NextRequest) {
-  const auth = await requireAuth(req);
-  if (!auth.ok) {
-    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  const gate = await requireModuleAccess(req, 'khata', 'full');
+  if (!gate.ok) {
+    return gate.response;
   }
 
   try {
-    const user_id = auth.user.id;
+    const user_id = gate.user.id;
     const { person_name, amount, type, due_date, note } = await req.json();
 
     const udhaar = await UdhaarModel.create({ user_id, person_name, amount, type, due_date, note });

@@ -4,10 +4,12 @@ import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 
+import { normalizeEmail } from "@/lib/utils";
 import BannedScreen from "@/components/BannedScreen";
+import { SyncRejectionBanner } from "@/components/SyncRejectionBanner";
 
 export default function AuthProvider({ children }: { children: React.ReactNode }) {
-  const { user, isUnlocked, token, setFeatureAccess } = useAuthStore();
+  const { user, isUnlocked, token, setFeatureAccess, featureAccess } = useAuthStore();
   const router = useRouter();
   const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
@@ -33,15 +35,82 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     } else if (user && !isUnlocked && pathname !== "/lock" && !isPublicPath) {
       router.replace("/lock");
     } else if (user && isUnlocked && isPublicPath) {
-      // The single place that decides where a freshly-authenticated user on
-      // /login or /register goes next. Login/register pages used to also call
-      // router.push() themselves right after calling login() - since that
-      // triggers this same effect, the two navigations raced, and this one
-      // always won, silently sending every first-time user straight past PIN
-      // setup. Centralizing it here (checking user.pin) is what actually fixes it.
       router.replace(user.pin ? "/" : "/lock/setup");
+    } else if (user && isUnlocked && !isPublicPath) {
+      // ----------------------------------------------------------------------
+      // DYNAMIC LAYER 2 ROUTE GUARD
+      // ----------------------------------------------------------------------
+      let userPerms: Record<string, string> | null = null;
+      let isOwner = user.role === 'ADMIN' || user.role === 'OWNER' || user.accountType === 'INDIVIDUAL' || !(user as any).organizationId;
+      
+      const cleanEmail = normalizeEmail(user.email);
+      if (typeof window !== 'undefined' && cleanEmail) {
+        try {
+          const cached = localStorage.getItem(`mindvault_perms_${cleanEmail}`);
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            userPerms = parsed.permissions;
+            if (parsed.isOwner !== undefined) isOwner = parsed.isOwner;
+          }
+        } catch {}
+      }
+
+      if (!isOwner && userPerms) {
+        const routeModuleMap: { prefix: string; module: string }[] = [
+          { prefix: '/erp', module: 'pos' },
+          { prefix: '/quotes', module: 'pos' },
+          { prefix: '/invoice-builder', module: 'pos' },
+          { prefix: '/services', module: 'service_tracker' },
+          { prefix: '/khata', module: 'khata' },
+          { prefix: '/vendors', module: 'vendors' },
+          { prefix: '/inventory', module: 'inventory' },
+          { prefix: '/categories', module: 'inventory' },
+          { prefix: '/locations', module: 'inventory' },
+          { prefix: '/production', module: 'factory' },
+          { prefix: '/staff', module: 'payroll' },
+          { prefix: '/budget', module: 'budget' },
+          { prefix: '/gulluck', module: 'budget' },
+          { prefix: '/kameti', module: 'budget' },
+          { prefix: '/pnl', module: 'reports' },
+          { prefix: '/reports', module: 'reports' },
+          { prefix: '/analytics', module: 'reports' },
+          { prefix: '/finance', module: 'roznamcha' },
+          { prefix: '/notes', module: 'notes_ai' },
+          { prefix: '/tools', module: 'tools' },
+          { prefix: '/tasks', module: 'tools' },
+          { prefix: '/sale-alerts', module: 'tools' },
+          { prefix: '/settings/team', module: 'team_management' },
+          { prefix: '/settings/roles', module: 'team_management' },
+        ];
+
+        for (const { prefix, module } of routeModuleMap) {
+          if (pathname.startsWith(prefix) && userPerms[module] === 'none') {
+            router.replace('/');
+            return;
+          }
+        }
+      }
+
+      // ----------------------------------------------------------------------
+      // LAYER 1: FEATURE TOGGLE/VIP ROUTE GUARD (Client-Side)
+      // ----------------------------------------------------------------------
+      if (featureAccess) {
+        const featureRoutes = [
+          { prefix: '/khata', feature: 'khata' },
+          { prefix: '/inventory', feature: 'inventory' },
+          { prefix: '/finance', feature: 'finance' },
+          { prefix: '/notes', feature: 'notes_ai' },
+        ];
+        
+        for (const { prefix, feature } of featureRoutes) {
+          if (pathname.startsWith(prefix) && featureAccess[feature] === false) {
+            router.replace('/');
+            return;
+          }
+        }
+      }
     }
-  }, [user, isUnlocked, pathname, router, mounted, isAdminRoute]);
+  }, [user, isUnlocked, pathname, router, mounted, isAdminRoute, featureAccess]);
 
   useEffect(() => {
     if (!token || !mounted) return;
@@ -119,5 +188,10 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     return <BannedScreen />;
   }
 
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      <SyncRejectionBanner />
+    </>
+  );
 }

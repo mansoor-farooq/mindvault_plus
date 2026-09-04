@@ -1,17 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ReminderModel } from '../../../../../lib/models/reminderModel';
-import { requireAuth } from '../../../../../lib/auth/jwtAuth';
+import { requireModuleAccess } from '../../../../../lib/auth/moduleGate';
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await requireAuth(req);
-  if (!auth.ok) {
-    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  const gate = await requireModuleAccess(req, 'tools', 'full');
+  if (!gate.ok) {
+    return gate.response;
   }
 
   try {
     const { id } = await params;
 
-    const completed = await ReminderModel.markCompleted(id, auth.user.id);
+    const completed = await ReminderModel.markCompleted(id, gate.user.id);
     if (!completed) {
       return NextResponse.json({ error: 'Reminder not found' }, { status: 404 });
     }

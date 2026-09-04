@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { UdhaarModel } from '../../../../../lib/models/udhaarModel';
-import { requireAuth } from '../../../../../lib/auth/jwtAuth';
+import { requireModuleAccess } from '../../../../../lib/auth/moduleGate';
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await requireAuth(req);
-  if (!auth.ok) {
-    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  const gate = await requireModuleAccess(req, 'khata', 'full');
+  if (!gate.ok) {
+    return gate.response;
   }
 
   try {
     const { id } = await params;
-    const user_id = auth.user.id;
+    const user_id = gate.user.id;
 
     const settled = await UdhaarModel.markSettled(id, user_id);
     if (!settled) {

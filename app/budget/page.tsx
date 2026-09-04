@@ -1,20 +1,19 @@
-﻿'use client';
+'use client';
 
 import { useState, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
 import { useAuthStore } from '@/store/authStore';
 import { SyncService } from '@/services/SyncService';
-import { ArrowLeft, Plus, Target, PieChart, Sparkles, TrendingUp, AlertCircle, Loader2, Radar, ArrowRight } from 'lucide-react';
+import { ArrowLeft, Plus, Target, PieChart, Sparkles, TrendingUp, AlertCircle, Loader2, Radar, ArrowRight, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 
-const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const BUDGET_CATEGORIES = ['Grocery', 'Shopping', 'Fuel', 'Investment', 'Utilities', 'Entertainment', 'Health', 'Other'];
 
 export default function BudgetPlannerPage() {
   const { token } = useAuthStore();
   const today = new Date();
-  const currentMonthStr = \\-\\;
+  const currentMonthStr = `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}`;
 
   const [selectedMonth, setSelectedMonth] = useState(currentMonthStr);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -38,7 +37,7 @@ export default function BudgetPlannerPage() {
   const monthlyExpenses = useMemo(() => {
     return expenses.filter(e => {
       const date = new Date(e.date);
-      const mStr = \\-\\;
+      const mStr = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
       return mStr === selectedMonth;
     });
   }, [expenses, selectedMonth]);
@@ -56,23 +55,29 @@ export default function BudgetPlannerPage() {
   const handleAddBudget = async () => {
     if (!newLimit || isNaN(Number(newLimit))) return;
     
-    // Check if category already has budget for this month
     const existing = budgets.find(b => b.category === newCat);
     if (existing) {
-      await db.budgets.update(existing.id!, { limitAmount: Number(newLimit), updatedAt: new Date() });
+      await db.budgets.update(existing.id!, { limitAmount: Number(newLimit), updatedAt: new Date().toISOString() });
     } else {
       await db.budgets.add({
+        syncId: crypto.randomUUID(),
         category: newCat,
         limitAmount: Number(newLimit),
         month: selectedMonth,
         isDeleted: false,
-        createdAt: new Date(),
-        updatedAt: new Date()
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       });
     }
     SyncService.sync();
     setShowAddModal(false);
     setNewLimit('');
+  };
+
+  const handleDeleteBudget = async (id: number) => {
+    if (!confirm('Are you sure you want to delete this budget limit?')) return;
+    await db.budgets.update(id, { isDeleted: true, updatedAt: new Date().toISOString() });
+    SyncService.sync();
   };
 
   const getAiAdvice = async () => {
@@ -84,7 +89,7 @@ export default function BudgetPlannerPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: \Bearer \\
+          Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({
           month: selectedMonth,
@@ -103,7 +108,7 @@ export default function BudgetPlannerPage() {
 
   return (
     <main className="flex-1 flex flex-col bg-gray-50 min-h-screen pb-20">
-      <header className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white p-4 shadow-lg sticky top-0 z-10 flex justify-between items-center">
+      <div className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white p-4 shadow-lg flex justify-between items-center shrink-0">
         <div className="flex items-center gap-3">
           <Link href="/" className="p-2 hover:bg-white/15 rounded-full transition-colors">
             <ArrowLeft className="w-6 h-6" />
@@ -115,9 +120,9 @@ export default function BudgetPlannerPage() {
         <button onClick={() => setShowAddModal(true)} className="p-2 bg-white/20 hover:bg-white/30 rounded-full">
           <Plus className="w-5 h-5" />
         </button>
-      </header>
+      </div>
 
-      <div className="p-4 max-w-2xl w-full mx-auto flex flex-col gap-6">
+      <div className="p-4 max-w-2xl w-full mx-auto flex flex-col gap-6 mt-4">
         
         {/* Month Selector */}
         <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between">
@@ -176,16 +181,28 @@ export default function BudgetPlannerPage() {
               <div key={b.id} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
                 <div className="flex justify-between items-center mb-2">
                   <span className="font-bold text-gray-700">{b.category}</span>
-                  <span className="text-sm font-medium text-gray-500">
-                    \ / <span className="text-gray-900 font-bold">\</span>
-                  </span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-medium text-gray-500">
+                      Rs {b.spent.toLocaleString()} / <span className="text-gray-900 font-bold">Rs {b.limitAmount.toLocaleString()}</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteBudget(b.id!)}
+                      className="p-1 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                      title="Delete Budget"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
                 
                 {/* Progress Bar */}
                 <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden">
                   <div 
-                    className={\h-3 rounded-full transition-all duration-500 \\}
-                    style={{ width: \\%\ }}
+                    className={`h-3 rounded-full transition-all duration-500 ${
+                      b.percent >= 100 ? 'bg-rose-500' : b.percent > 80 ? 'bg-orange-500' : 'bg-emerald-500'
+                    }`}
+                    style={{ width: `${b.percent}%` }}
                   ></div>
                 </div>
                 
@@ -203,6 +220,7 @@ export default function BudgetPlannerPage() {
             ))}
           </div>
         )}
+        
         {/* Sale Radar CTA */}
         <Link href="/sale-alerts" className="mt-2 bg-gradient-to-r from-rose-500 to-pink-500 text-white p-5 rounded-3xl shadow-lg shadow-rose-200 flex items-center justify-between hover:-translate-y-1 hover:shadow-xl transition-all">
           <div>
@@ -235,12 +253,12 @@ export default function BudgetPlannerPage() {
             </div>
 
             <div>
-              <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Maximum Limit ($)</label>
+              <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Maximum Limit (Rs)</label>
               <input 
                 type="number" 
                 value={newLimit} 
                 onChange={e => setNewLimit(e.target.value)}
-                placeholder="e.g. 500"
+                placeholder="e.g. 50000"
                 className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 outline-none focus:border-emerald-500"
               />
             </div>
@@ -255,4 +273,3 @@ export default function BudgetPlannerPage() {
     </main>
   );
 }
-

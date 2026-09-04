@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ReminderModel } from '../../../../../lib/models/reminderModel';
-import { requireAuth } from '../../../../../lib/auth/jwtAuth';
+import { requireModuleAccess } from '../../../../../lib/auth/moduleGate';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ note_id: string }> }) {
-  const auth = await requireAuth(req);
-  if (!auth.ok) {
-    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  const gate = await requireModuleAccess(req, 'tools', 'view');
+  if (!gate.ok) {
+    return gate.response;
   }
 
   try {
     const { note_id } = await params;
-    const reminders = await ReminderModel.findByNoteId(note_id, auth.user.id);
+    const reminders = await ReminderModel.findByNoteId(note_id, gate.user.id);
     return NextResponse.json({ reminders });
   } catch (error) {
     console.error(error);

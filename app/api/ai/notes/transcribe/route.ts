@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No audio data provided' }, { status: 400 });
     }
 
-    const prompt = \${localeContext(locale)}You are an expert audio transcription assistant. 
+    const prompt = `${localeContext(locale)}You are an expert audio transcription assistant. 
 Please transcribe this voice recording accurately. 
 Also generate:
 1. A concise 3-6 word title.
@@ -38,7 +38,7 @@ Respond with ONLY a valid JSON object in this exact schema:
   "summary": "Short summary here",
   "tags": ["Tag1", "Tag2"],
   "actionItems": ["Action 1", "Action 2"]
-}\;
+}`;
 
     const rawResponse = await generateText(prompt, {
       audio: { mimeType, base64: audioBase64 },

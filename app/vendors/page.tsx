@@ -1,13 +1,16 @@
-﻿'use client';
+'use client';
 
 import { useState, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, PurchaseItem } from '@/lib/db';
 import { SyncService } from '@/services/SyncService';
-import { ArrowLeft, Truck, Plus, Search, Building2, Phone, ReceiptText, ArrowDownLeft, Calendar } from 'lucide-react';
+import { useAuthStore } from '@/store/authStore';
+import { getTerm } from '@/lib/terminology';
+import { ArrowLeft, Truck, Plus, Search, Building2, Phone, ReceiptText, ArrowDownLeft, Calendar, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 
 export default function VendorsPage() {
+  const { user } = useAuthStore();
   const [activeTab, setActiveTab] = useState<'VENDORS' | 'PURCHASES'>('VENDORS');
   const [showAddVendor, setShowAddVendor] = useState(false);
   const [showAddPO, setShowAddPO] = useState(false);
@@ -23,8 +26,8 @@ export default function VendorsPage() {
   const [poItems, setPoItems] = useState<PurchaseItem[]>([{ description: '', quantity: 1, unitPrice: 0, total: 0 }]);
   const [poPaid, setPoPaid] = useState('');
 
-  const vendors = useLiveQuery(() => db.vendors.reverse().toArray(), []) || [];
-  const purchases = useLiveQuery(() => db.purchaseOrders.reverse().toArray(), []) || [];
+  const vendors = useLiveQuery(() => db.vendors.filter(v => !v.isDeleted).reverse().toArray(), []) || [];
+  const purchases = useLiveQuery(() => db.purchaseOrders.filter(p => !p.isDeleted).reverse().toArray(), []) || [];
 
   const vendorBalances = useMemo(() => {
     const balances: Record<string, number> = {};
@@ -48,11 +51,24 @@ export default function VendorsPage() {
       companyName: vCompany,
       phone: vPhone,
       openingBalance: Number(vBalance) || 0,
+      isDeleted: false,
       createdAt: new Date()
     });
     SyncService.sync();
     setShowAddVendor(false);
     setVName(''); setVCompany(''); setVPhone(''); setVBalance('');
+  };
+
+  const handleDeleteVendor = async (vendorId: number) => {
+    if (!confirm('Are you sure you want to remove this vendor?')) return;
+    await db.vendors.update(vendorId, { isDeleted: true, deletedAt: new Date() });
+    SyncService.sync();
+  };
+
+  const handleDeletePO = async (poId: number) => {
+    if (!confirm('Are you sure you want to delete this purchase record?')) return;
+    await db.purchaseOrders.update(poId, { isDeleted: true, deletedAt: new Date() });
+    SyncService.sync();
   };
 
   const handlePOItemChange = (index: number, field: keyof PurchaseItem, value: any) => {
@@ -75,7 +91,7 @@ export default function VendorsPage() {
     await db.purchaseOrders.add({
       syncId: crypto.randomUUID(),
       vendorId: poVendor,
-      poNumber: \PO-\\,
+      poNumber: `PO-${Date.now().toString().slice(-6)}`,
       date: new Date(),
       items: poItems,
       totalAmount,
@@ -95,20 +111,36 @@ export default function VendorsPage() {
 
   return (
     <main className="flex-1 flex flex-col bg-slate-50 min-h-screen">
-      <header className="bg-white border-b border-slate-200 p-4 sticky top-0 z-10 flex justify-between items-center shrink-0">
-        <div className="flex items-center gap-3">
-          <Link href="/" className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
-            <ArrowLeft className="w-5 h-5 text-slate-600" />
-          </Link>
-          <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-            <Truck className="w-5 h-5 text-indigo-600" /> Suppliers & Purchases
-          </h1>
+      <div className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+        <div className="p-4 flex justify-between items-center shrink-0">
+          <div className="flex items-center gap-3">
+            <Link href="/" className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
+              <ArrowLeft className="w-5 h-5 text-slate-600" />
+            </Link>
+            <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+              <Truck className="w-5 h-5 text-indigo-600" /> {getTerm(user, 'vendors')} & Purchases
+            </h1>
+          </div>
         </div>
-      </header>
 
-      <div className="bg-white px-4 flex gap-4 border-b border-slate-200 sticky top-[73px] z-10">
-        <button onClick={() => setActiveTab('VENDORS')} className={\py-4 font-bold text-sm border-b-2 transition-colors \\}>Vendors</button>
-        <button onClick={() => setActiveTab('PURCHASES')} className={\py-4 font-bold text-sm border-b-2 transition-colors \\}>Purchase Orders</button>
+        <div className="px-4 flex gap-4 border-t border-slate-100">
+          <button 
+            onClick={() => setActiveTab('VENDORS')} 
+            className={`py-3 font-bold text-sm border-b-2 transition-colors ${
+              activeTab === 'VENDORS' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500'
+            }`}
+          >
+            {getTerm(user, 'vendors')}
+          </button>
+          <button 
+            onClick={() => setActiveTab('PURCHASES')} 
+            className={`py-3 font-bold text-sm border-b-2 transition-colors ${
+              activeTab === 'PURCHASES' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500'
+            }`}
+          >
+            Purchase Orders
+          </button>
+        </div>
       </div>
 
       <div className="p-4 lg:p-8 max-w-5xl w-full mx-auto flex flex-col gap-6">
@@ -125,7 +157,7 @@ export default function VendorsPage() {
 
         {/* VENDORS TAB */}
         {activeTab === 'VENDORS' && (
-          <div className="flex flex-col gap-4 animate-in fade-in">
+          <div className="flex flex-col gap-4">
             <div className="flex justify-between items-center">
               <h2 className="font-bold text-slate-700">Vendor Directory</h2>
               <button onClick={() => setShowAddVendor(true)} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl font-bold flex items-center gap-2 transition-colors shadow-lg shadow-indigo-200">
@@ -147,11 +179,21 @@ export default function VendorsPage() {
                       <p className="text-xs text-slate-500 font-medium bg-slate-100 px-2 py-1 rounded-lg inline-block mt-1">{v.companyName || 'Independent'}</p>
                       <p className="text-xs text-slate-500 flex items-center gap-1 mt-2"><Phone className="w-3 h-3" /> {v.phone || 'No phone'}</p>
                     </div>
-                    <div className="text-right">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Payable Balance</p>
-                      <p className={\ont-black text-lg \\}>
-                        Rs {vendorBalances[v.syncId!].toLocaleString()}
-                      </p>
+                    <div className="flex items-center gap-4">
+                      <div className="text-right">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Payable Balance</p>
+                        <p className={`font-black text-lg ${vendorBalances[v.syncId!] > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
+                          Rs {vendorBalances[v.syncId!].toLocaleString()}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteVendor(v.id!)}
+                        className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors"
+                        title="Delete Vendor"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
                 ))
@@ -162,7 +204,7 @@ export default function VendorsPage() {
 
         {/* PURCHASES TAB */}
         {activeTab === 'PURCHASES' && (
-          <div className="flex flex-col gap-4 animate-in fade-in">
+          <div className="flex flex-col gap-4">
              <div className="flex justify-between items-center">
               <h2 className="font-bold text-slate-700">Purchase Orders</h2>
               <button onClick={() => setShowAddPO(true)} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl font-bold flex items-center gap-2 transition-colors shadow-lg shadow-indigo-200">
@@ -203,6 +245,14 @@ export default function VendorsPage() {
                           <p className="text-xs font-bold text-rose-500">Added to Udhaar</p>
                           <p className="font-black text-rose-700">Rs {pending.toLocaleString()}</p>
                         </div>
+                        <button
+                          type="button"
+                          onClick={() => handleDeletePO(p.id!)}
+                          className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors"
+                          title="Delete Purchase Order"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     </div>
                   );
@@ -216,7 +266,7 @@ export default function VendorsPage() {
       {/* Add Vendor Modal */}
       {showAddVendor && (
         <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl w-full max-w-md p-6 flex flex-col gap-4 shadow-2xl animate-in zoom-in-95">
+          <div className="bg-white rounded-3xl w-full max-w-md p-6 flex flex-col gap-4 shadow-2xl">
             <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
               <Building2 className="w-6 h-6 text-indigo-600" /> Add Supplier
             </h2>
@@ -247,7 +297,7 @@ export default function VendorsPage() {
       {/* Add PO Modal */}
       {showAddPO && (
         <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl w-full max-w-2xl p-6 flex flex-col gap-4 shadow-2xl animate-in zoom-in-95 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-3xl w-full max-w-2xl p-6 flex flex-col gap-4 shadow-2xl max-h-[90vh] overflow-y-auto">
             <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
               <ReceiptText className="w-6 h-6 text-indigo-600" /> Record Purchase
             </h2>

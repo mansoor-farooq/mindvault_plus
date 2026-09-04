@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
     }
 
     const context = relevantNotes
-      .map((n, i) => `[Note ${i + 1}] Title: ${n.title}\nCategory: ${n.category || 'General'}\n${n.summary || n.description || ''}`)
+      .map((n: any, i: number) => `[Note ${i + 1}] Title: ${n.title}\nCategory: ${n.category || 'General'}\n${n.summary || n.description || ''}`)
       .join('\n\n')
       .slice(0, 60000); // 60,000 char budget cap
 

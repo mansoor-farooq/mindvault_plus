@@ -1,39 +1,52 @@
-﻿'use client';
+'use client';
 
 import { useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
+import { useAuthStore } from '@/store/authStore';
+import { getTerm } from '@/lib/terminology';
 import { 
   TrendingUp, Users, Package, Wallet, 
-  ArrowUpRight, ArrowRight, Receipt, Store 
+  ArrowUpRight, ArrowRight, Receipt, Store,
+  Sparkles, TriangleAlert 
 } from 'lucide-react';
 import Link from 'next/link';
 
 export default function Home() {
+  const user = useAuthStore(s => s.user);
+  const isFree = !user?.license || user.license === 'FREE';
+  
+  let daysUntilExpiry = null;
+  if (user?.license === 'PRO' && user?.licenseExpiry) {
+    const expiry = new Date(user.licenseExpiry);
+    const now = new Date();
+    daysUntilExpiry = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  }
+
   // Query Data
-  const invoices = useLiveQuery(() => db.invoices.toArray(), []) || [];
-  const employees = useLiveQuery(() => db.employees.filter(e => e.isActive).toArray(), []) || [];
+  const invoices = useLiveQuery(() => db.invoices.filter(i => !i.isDeleted).toArray(), []) || [];
+  const employees = useLiveQuery(() => db.employees.filter(e => e.isActive && !e.isDeleted).toArray(), []) || [];
   const products = useLiveQuery(() => db.products.filter(p => !p.isDeleted).toArray(), []) || [];
-  const khataTxns = useLiveQuery(() => db.khataTransactions.toArray(), []) || [];
-  const ledgerEntries = useLiveQuery(() => db.ledgerEntries.toArray(), []) || [];
+  const khataTxns = useLiveQuery(() => db.khataTransactions.filter(k => !k.isDeleted).toArray(), []) || [];
+  const ledgerEntries = useLiveQuery(() => db.ledgerEntries.filter(l => !l.isDeleted).toArray(), []) || [];
 
   // Derived Metrics
   const metrics = useMemo(() => {
     // 1. Total ERP Revenue
-    const totalRevenue = invoices.reduce((sum, inv) => sum + inv.total, 0);
+    const totalRevenue = invoices.reduce((sum, inv) => sum + (Number(inv.total) || 0), 0);
     
     // 2. Total Market Receivables (Khata)
     let marketCredit = 0;
     khataTxns.forEach(t => {
-      if (t.type === 'CREDIT') marketCredit += Number(t.amount);
-      if (t.type === 'DEBIT') marketCredit -= Number(t.amount);
+      if (t.type === 'CREDIT' || t.type === 'GIVEN') marketCredit += Number(t.amount || 0);
+      if (t.type === 'DEBIT' || t.type === 'RECEIVED') marketCredit -= Number(t.amount || 0);
     });
 
     // 3. Cash/Bank Balance
     let cashBalance = 0;
     ledgerEntries.forEach(e => {
-      if (e.type === 'INCOME') cashBalance += Number(e.amount);
-      if (e.type === 'EXPENSE') cashBalance -= Number(e.amount);
+      if (e.type === 'INCOME') cashBalance += Number(e.amount || 0);
+      if (e.type === 'EXPENSE') cashBalance -= Number(e.amount || 0);
     });
 
     return { totalRevenue, marketCredit, cashBalance };
@@ -43,12 +56,41 @@ export default function Home() {
 
   return (
     <div className="p-4 lg:p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in">
-      
+      {isFree && (
+        <div className="bg-amber-100 border border-amber-200 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <Sparkles className="w-6 h-6 text-amber-600 shrink-0" />
+            <div>
+              <h4 className="font-bold text-amber-900">Upgrade to MindVault Starter or PRO</h4>
+              <p className="text-amber-800 text-sm">Grow your business with plans starting from just $6/mo (~Rs 1,600/mo). Get 500+ Khata customers, WhatsApp reminders, and AI tools.</p>
+            </div>
+          </div>
+          <Link href="/upgrade" className="whitespace-nowrap px-4 py-2 bg-amber-500 hover:bg-amber-600 text-amber-950 font-bold rounded-lg shadow-sm transition-colors text-sm">
+            View Pricing & Plans
+          </Link>
+        </div>
+      )}
+
+      {daysUntilExpiry !== null && daysUntilExpiry <= 7 && daysUntilExpiry >= 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <TriangleAlert className="w-6 h-6 text-red-600 shrink-0" />
+            <div>
+              <h4 className="font-bold text-red-900">Subscription Expiring Soon</h4>
+              <p className="text-red-800 text-sm">Your PRO license will expire in {daysUntilExpiry} days. Renew now to avoid losing access to VIP features.</p>
+            </div>
+          </div>
+          <Link href="/upgrade" className="whitespace-nowrap px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg shadow-sm transition-colors text-sm">
+            Renew Now
+          </Link>
+        </div>
+      )}
+
       {/* Welcome Banner */}
       <div className="bg-indigo-900 rounded-3xl p-8 text-white shadow-xl relative overflow-hidden">
         <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-500/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3"></div>
         <div className="relative z-10">
-          <h1 className="text-3xl font-black mb-2">Business Overview</h1>
+          <h1 className="text-3xl font-black mb-2">{getTerm(user, 'dashboard')}</h1>
           <p className="text-indigo-200">Welcome back. Here is what's happening across your company today.</p>
           
           <div className="mt-8 flex flex-wrap gap-4">
@@ -56,7 +98,7 @@ export default function Home() {
               <Receipt className="w-4 h-4" /> Create Invoice
             </Link>
             <Link href="/staff" className="bg-indigo-800 border border-indigo-700 text-white px-6 py-3 rounded-xl font-bold text-sm hover:bg-indigo-700 transition-colors flex items-center gap-2 shadow-lg">
-              <Users className="w-4 h-4" /> Manage Staff
+              <Users className="w-4 h-4" /> Manage {getTerm(user, 'staff')}
             </Link>
           </div>
         </div>
@@ -85,7 +127,7 @@ export default function Home() {
               <Store className="w-6 h-6" />
             </div>
           </div>
-          <p className="text-sm font-bold text-slate-500 uppercase tracking-wider">Market Credit (Khata)</p>
+          <p className="text-sm font-bold text-slate-500 uppercase tracking-wider">{getTerm(user, 'customers')} (Pending)</p>
           <p className="text-2xl font-black text-slate-800 mt-1">Rs {metrics.marketCredit.toLocaleString()}</p>
         </div>
 
@@ -96,7 +138,7 @@ export default function Home() {
               <Wallet className="w-6 h-6" />
             </div>
           </div>
-          <p className="text-sm font-bold text-slate-500 uppercase tracking-wider">Cash Balance</p>
+          <p className="text-sm font-bold text-slate-500 uppercase tracking-wider">{getTerm(user, 'finance')}</p>
           <p className="text-2xl font-black text-slate-800 mt-1">Rs {metrics.cashBalance.toLocaleString()}</p>
         </div>
 
@@ -107,7 +149,7 @@ export default function Home() {
               <Users className="w-6 h-6" />
             </div>
           </div>
-          <p className="text-sm font-bold text-slate-500 uppercase tracking-wider">Active Factory Staff</p>
+          <p className="text-sm font-bold text-slate-500 uppercase tracking-wider">{getTerm(user, 'staff')}</p>
           <p className="text-2xl font-black text-slate-800 mt-1">{employees.length}</p>
         </div>
       </div>
@@ -144,7 +186,7 @@ export default function Home() {
                       <td className="p-4 text-slate-600">{inv.customerName}</td>
                       <td className="p-4 text-slate-500">{new Date(inv.date).toLocaleDateString()}</td>
                       <td className="p-4">
-                        <span className={\	ext-[10px] font-bold px-2 py-1 rounded-full \\}>
+                        <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${inv.paymentMethod === 'CASH' ? 'bg-emerald-100 text-emerald-700' : 'bg-indigo-100 text-indigo-700'}`}>
                           {inv.paymentMethod}
                         </span>
                       </td>
@@ -161,14 +203,14 @@ export default function Home() {
         <div className="bg-slate-900 rounded-3xl shadow-xl p-6 text-white flex flex-col relative overflow-hidden">
           <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-indigo-500/20 rounded-full blur-3xl"></div>
           <h2 className="font-bold text-lg mb-6 flex items-center gap-2 relative z-10">
-            <Package className="w-5 h-5 text-indigo-400" /> Inventory Status
+            <Package className="w-5 h-5 text-indigo-400" /> {getTerm(user, 'inventory')} Status
           </h2>
           
           <div className="flex-1 flex flex-col justify-center relative z-10">
             <div className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-br from-indigo-200 to-white mb-2">
               {products.length}
             </div>
-            <p className="text-indigo-200 font-medium">Total Products</p>
+            <p className="text-indigo-200 font-medium">Total Items</p>
           </div>
 
           <div className="mt-8 border-t border-white/10 pt-6 relative z-10">

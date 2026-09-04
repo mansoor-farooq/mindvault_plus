@@ -1,10 +1,10 @@
-﻿'use client';
+'use client';
 
 import { useState, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
 import { SyncService } from '@/services/SyncService';
-import { ArrowLeft, UserPlus, Briefcase, CalendarCheck, HandCoins, Users, ReceiptText, CircleCheck, CircleX, Loader2 } from 'lucide-react';
+import { ArrowLeft, UserPlus, Briefcase, CalendarCheck, HandCoins, Users, ReceiptText, Trash2, CheckCircle2 } from 'lucide-react';
 import Link from 'next/link';
 
 export default function StaffManagerPage() {
@@ -28,20 +28,32 @@ export default function StaffManagerPage() {
   const [selectedDate, setSelectedDate] = useState(todayStr);
 
   // Queries
-  const employees = useLiveQuery(() => db.employees.filter(e => e.isActive).toArray(), []) || [];
-  const attendances = useLiveQuery(() => db.attendance.toArray(), []) || [];
-  const advances = useLiveQuery(() => db.advances.filter(a => !a.isDeducted).toArray(), []) || [];
+  const employees = useLiveQuery(() => db.employees.filter(e => e.isActive && !e.isDeleted).toArray(), []) || [];
+  const attendances = useLiveQuery(() => db.attendance.filter(a => !a.isDeleted).toArray(), []) || [];
+  const advances = useLiveQuery(() => db.advances.filter(a => !a.isDeducted && !a.isDeleted).toArray(), []) || [];
+
+  const handleDeleteEmployee = async (id: number) => {
+    if (!confirm('Are you sure you want to remove this employee?')) return;
+    await db.employees.update(id, { isDeleted: true, isActive: false, updatedAt: new Date().toISOString() });
+    SyncService.sync();
+  };
+
+  const handleSettlePeshgi = async (id: number) => {
+    await db.advances.update(id, { isDeducted: true, deletedAt: new Date().toISOString() });
+    SyncService.sync();
+  };
 
   const handleAddEmployee = async () => {
     if (!empName || !empSalary) return;
     await db.employees.add({
+      syncId: crypto.randomUUID(),
       name: empName,
       role: empRole || 'Worker',
       phone: empPhone,
       baseSalary: Number(empSalary),
       isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date()
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     });
     SyncService.sync();
     setShowAddEmp(false);
@@ -51,12 +63,13 @@ export default function StaffManagerPage() {
   const handleAddPeshgi = async () => {
     if (!peshgiEmpId || !peshgiAmount) return;
     await db.advances.add({
+      syncId: crypto.randomUUID(),
       employeeId: peshgiEmpId,
       amount: Number(peshgiAmount),
       date: todayStr,
       description: peshgiDesc || 'Cash Advance (Peshgi)',
       isDeducted: false,
-      createdAt: new Date()
+      createdAt: new Date().toISOString()
     });
     SyncService.sync();
     setShowAddPeshgi(false);
@@ -68,7 +81,13 @@ export default function StaffManagerPage() {
     if (existing) {
       await db.attendance.update(existing.id!, { status });
     } else {
-      await db.attendance.add({ employeeId: empId, date: selectedDate, status, createdAt: new Date() });
+      await db.attendance.add({ 
+        syncId: crypto.randomUUID(), 
+        employeeId: empId, 
+        date: selectedDate, 
+        status, 
+        createdAt: new Date().toISOString() 
+      });
     }
     SyncService.sync();
   };
@@ -83,7 +102,6 @@ export default function StaffManagerPage() {
       const absents = empAtt.filter(a => a.status === 'ABSENT').length;
       const halfDays = empAtt.filter(a => a.status === 'HALF_DAY').length;
       
-      // Calculate deductions based on 30 day standard
       const perDaySalary = emp.baseSalary / 30;
       const attendanceDeduction = (absents * perDaySalary) + (halfDays * (perDaySalary / 2));
       
@@ -106,7 +124,7 @@ export default function StaffManagerPage() {
 
   return (
     <main className="flex-1 flex flex-col bg-slate-50 min-h-screen pb-20">
-      <header className="bg-gradient-to-r from-indigo-700 to-blue-800 text-white p-4 shadow-lg sticky top-0 z-10 flex justify-between items-center">
+      <div className="bg-gradient-to-r from-indigo-700 to-blue-800 text-white p-4 shadow-lg flex justify-between items-center shrink-0">
         <div className="flex items-center gap-3">
           <Link href="/" className="p-2 hover:bg-white/15 rounded-full transition-colors">
             <ArrowLeft className="w-6 h-6" />
@@ -115,20 +133,41 @@ export default function StaffManagerPage() {
             <Briefcase className="w-5 h-5" /> Factory & Staff
           </h1>
         </div>
-      </header>
+      </div>
 
       {/* Tabs */}
-      <div className="bg-white px-4 border-b border-slate-200 flex justify-between sticky top-[68px] z-10 shadow-sm">
-        <button onClick={() => setActiveTab('EMPLOYEES')} className={\py-4 font-bold text-sm border-b-2 transition-all \\}>Payroll</button>
-        <button onClick={() => setActiveTab('ATTENDANCE')} className={\py-4 font-bold text-sm border-b-2 transition-all \\}>Attendance</button>
-        <button onClick={() => setActiveTab('PESHGI')} className={\py-4 font-bold text-sm border-b-2 transition-all \\}>Peshgi</button>
+      <div className="bg-white px-4 border-b border-slate-200 flex justify-between sticky top-0 z-20 shadow-sm">
+        <button 
+          onClick={() => setActiveTab('EMPLOYEES')} 
+          className={`py-4 font-bold text-sm border-b-2 transition-all ${
+            activeTab === 'EMPLOYEES' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500'
+          }`}
+        >
+          Payroll
+        </button>
+        <button 
+          onClick={() => setActiveTab('ATTENDANCE')} 
+          className={`py-4 font-bold text-sm border-b-2 transition-all ${
+            activeTab === 'ATTENDANCE' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500'
+          }`}
+        >
+          Attendance
+        </button>
+        <button 
+          onClick={() => setActiveTab('PESHGI')} 
+          className={`py-4 font-bold text-sm border-b-2 transition-all ${
+            activeTab === 'PESHGI' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500'
+          }`}
+        >
+          Peshgi
+        </button>
       </div>
 
       <div className="p-4 max-w-3xl w-full mx-auto flex flex-col gap-6 mt-2">
 
         {/* EMPLOYEES & PAYROLL TAB */}
         {activeTab === 'EMPLOYEES' && (
-          <div className="flex flex-col gap-4 animate-in fade-in">
+          <div className="flex flex-col gap-4">
             <button onClick={() => setShowAddEmp(true)} className="bg-indigo-600 text-white font-bold p-4 rounded-2xl shadow-lg shadow-indigo-200 flex items-center justify-center gap-2 hover:-translate-y-0.5 transition-transform">
               <UserPlus className="w-5 h-5" /> Register New Employee
             </button>
@@ -146,9 +185,19 @@ export default function StaffManagerPage() {
                       <h3 className="font-bold text-lg text-slate-800">{p.name}</h3>
                       <p className="text-xs text-slate-500 font-medium bg-slate-100 px-2 py-1 rounded-full inline-block mt-1">{p.role}</p>
                     </div>
-                    <div className="text-right">
-                      <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Base Salary</p>
-                      <p className="font-bold text-slate-700">Rs {p.baseSalary.toLocaleString()}</p>
+                    <div className="flex items-center gap-3">
+                      <div className="text-right">
+                        <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Base Salary</p>
+                        <p className="font-bold text-slate-700">Rs {p.baseSalary.toLocaleString()}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteEmployee(p.id!)}
+                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                        title="Remove Employee"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
 
@@ -178,7 +227,7 @@ export default function StaffManagerPage() {
 
         {/* ATTENDANCE TAB */}
         {activeTab === 'ATTENDANCE' && (
-          <div className="flex flex-col gap-4 animate-in fade-in">
+          <div className="flex flex-col gap-4">
             <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between">
               <h2 className="font-bold text-slate-700 flex items-center gap-2"><CalendarCheck className="w-5 h-5 text-indigo-500" /> Select Date</h2>
               <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} className="border border-slate-200 rounded-lg p-2 text-sm font-medium outline-none focus:border-indigo-500" />
@@ -204,16 +253,28 @@ export default function StaffManagerPage() {
                     <div className="flex gap-2 bg-slate-50 p-1.5 rounded-xl border border-slate-100">
                       <button 
                         onClick={() => handleMarkAttendance(emp.syncId!, 'PRESENT')}
-                        className={\lex-1 sm:flex-none px-4 py-2 rounded-lg text-xs font-bold transition-all \\}
-                      >Present</button>
+                        className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                          status === 'PRESENT' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-white text-slate-600 hover:bg-slate-100'
+                        }`}
+                      >
+                        Present
+                      </button>
                       <button 
                         onClick={() => handleMarkAttendance(emp.syncId!, 'HALF_DAY')}
-                        className={\lex-1 sm:flex-none px-4 py-2 rounded-lg text-xs font-bold transition-all \\}
-                      >Half</button>
+                        className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                          status === 'HALF_DAY' ? 'bg-amber-500 text-white shadow-sm' : 'bg-white text-slate-600 hover:bg-slate-100'
+                        }`}
+                      >
+                        Half
+                      </button>
                       <button 
                         onClick={() => handleMarkAttendance(emp.syncId!, 'ABSENT')}
-                        className={\lex-1 sm:flex-none px-4 py-2 rounded-lg text-xs font-bold transition-all \\}
-                      >Absent</button>
+                        className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                          status === 'ABSENT' ? 'bg-rose-600 text-white shadow-sm' : 'bg-white text-slate-600 hover:bg-slate-100'
+                        }`}
+                      >
+                        Absent
+                      </button>
                     </div>
                   </div>
                 );
@@ -224,7 +285,7 @@ export default function StaffManagerPage() {
 
         {/* PESHGI TAB */}
         {activeTab === 'PESHGI' && (
-          <div className="flex flex-col gap-4 animate-in fade-in">
+          <div className="flex flex-col gap-4">
             <button onClick={() => setShowAddPeshgi(true)} className="bg-amber-500 text-white font-bold p-4 rounded-2xl shadow-lg shadow-amber-200 flex items-center justify-center gap-2 hover:-translate-y-0.5 transition-transform">
               <HandCoins className="w-5 h-5" /> Give Peshgi (Advance)
             </button>
@@ -240,8 +301,18 @@ export default function StaffManagerPage() {
                         <CalendarCheck className="w-3 h-3" /> {adv.date} • {adv.description}
                       </p>
                     </div>
-                    <div className="text-right">
-                      <p className="font-bold text-rose-600">- Rs {adv.amount.toLocaleString()}</p>
+                    <div className="flex items-center gap-3">
+                      <div className="text-right">
+                        <p className="font-bold text-rose-600">- Rs {adv.amount.toLocaleString()}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleSettlePeshgi(adv.id!)}
+                        className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-1"
+                        title="Mark as Settled / Deducted"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Settle
+                      </button>
                     </div>
                   </div>
                 );

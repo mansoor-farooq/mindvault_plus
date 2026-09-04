@@ -1,24 +1,35 @@
-﻿'use client';
+'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, Product, KhataCustomer } from '@/lib/db';
-import { ArrowLeft, Search, ShoppingCart, Trash2, Printer, Sparkles, FileText, Package } from 'lucide-react';
+import { db, Product } from '@/lib/db';
+import { ArrowLeft, Plus, Minus, Search, Trash2, Printer, FileText, Package, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 
-export default function QuoteBuilderPage() {
-  const products = useLiveQuery(() => db.products.filter(p => !p.isDeleted).toArray(), []) || [];
-  const customers = useLiveQuery(() => db.khataCustomers.filter(c => !c.isDeleted).toArray(), []) || [];
+interface QuoteItem {
+  productId: string;
+  name: string;
+  quantity: number;
+  unitPrice: number;
+  total: number;
+}
 
-  const [cart, setCart] = useState<any[]>([]);
+export default function QuotesPage() {
+  const [cart, setCart] = useState<QuoteItem[]>([]);
+  const [selectedCustomerId, setSelectedCustomerId] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [discount, setDiscount] = useState(0);
-  const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
-  
-  // Print Mode State
   const [isPrinting, setIsPrinting] = useState(false);
+  const [customItemName, setCustomItemName] = useState('');
+  const [customItemPrice, setCustomItemPrice] = useState('');
 
-  const filteredProducts = products.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase())).slice(0, 5);
+  const products = useLiveQuery(() => db.products.filter(p => !p.isDeleted).toArray()) || [];
+  const customers = useLiveQuery(() => db.khataCustomers.filter(c => !c.isDeleted).toArray()) || [];
+
+  const filteredProducts = useMemo(() => {
+    if (!searchQuery) return [];
+    return products.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase())).slice(0, 5);
+  }, [products, searchQuery]);
 
   const subtotal = cart.reduce((sum, item) => sum + item.total, 0);
   const finalTotal = Math.max(0, subtotal - discount);
@@ -27,19 +38,53 @@ export default function QuoteBuilderPage() {
     setCart(prev => {
       const existing = prev.find(i => i.productId === product.syncId);
       if (existing) {
-        return prev.map(i => i.productId === product.syncId 
-          ? { ...i, quantity: i.quantity + 1, total: (i.quantity + 1) * i.unitPrice } 
-          : i);
+        return prev.map(i => i.productId === product.syncId ? {
+          ...i,
+          quantity: i.quantity + 1,
+          total: (i.quantity + 1) * i.unitPrice
+        } : i);
       }
       return [...prev, {
         productId: product.syncId!,
         name: product.name,
         quantity: 1,
-        unitPrice: Number(product.price) || 0,
-        total: Number(product.price) || 0
+        unitPrice: product.price || product.sellingPrice || 0,
+        total: product.price || product.sellingPrice || 0
       }];
     });
     setSearchQuery('');
+  };
+
+  const addCustomItem = () => {
+    if (!customItemName.trim() || !customItemPrice || isNaN(Number(customItemPrice))) return;
+    const priceNum = Number(customItemPrice);
+    setCart(prev => [
+      ...prev,
+      {
+        productId: `custom-${Date.now()}`,
+        name: customItemName.trim(),
+        quantity: 1,
+        unitPrice: priceNum,
+        total: priceNum
+      }
+    ]);
+    setCustomItemName('');
+    setCustomItemPrice('');
+  };
+
+  const updateQuantity = (productId: string, delta: number) => {
+    setCart(prev =>
+      prev
+        .map(i => {
+          if (i.productId === productId) {
+            const newQty = i.quantity + delta;
+            if (newQty <= 0) return null;
+            return { ...i, quantity: newQty, total: newQty * i.unitPrice };
+          }
+          return i;
+        })
+        .filter(Boolean) as QuoteItem[]
+    );
   };
 
   const removeFromCart = (productId: string) => {
@@ -56,77 +101,189 @@ export default function QuoteBuilderPage() {
   };
 
   const customer = customers.find(c => c.syncId === selectedCustomerId);
-  const quoteNumber = \EST-\\;
+  const quoteNumber = `EST-${Date.now().toString().slice(-6)}`;
 
   return (
-    <main className="flex-1 flex flex-col bg-slate-950 min-h-screen text-slate-200 print:bg-white print:text-black">
+    <main className="min-h-screen bg-slate-50/60 p-4 sm:p-8 pb-24 text-slate-800 print:bg-white print:p-0 print:text-black">
       
       {/* HEADER - Hidden in Print */}
-      <header className="bg-gradient-to-r from-amber-600 to-orange-700 text-white p-4 shadow-2xl sticky top-0 z-10 flex justify-between items-center print:hidden">
-        <div className="flex items-center gap-3">
-          <Link href="/" className="p-2 hover:bg-white/10 rounded-full transition-colors">
-            <ArrowLeft className="w-6 h-6 text-amber-200" />
+      <div className="max-w-5xl mx-auto mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 print:hidden">
+        <div className="flex items-center gap-3.5">
+          <Link 
+            href="/" 
+            className="p-2.5 bg-white rounded-2xl border border-slate-200/80 text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-all shadow-sm"
+            title="Back to Dashboard"
+          >
+            <ArrowLeft className="w-5 h-5" />
           </Link>
-          <h1 className="text-xl font-black tracking-tight flex items-center gap-2">
-            <FileText className="w-5 h-5 text-amber-200" /> Takhmeena (Estimate Builder)
-          </h1>
+          <div>
+            <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 mb-0.5">
+              <span>Workspace</span>
+              <span>/</span>
+              <span>Sales & Billing</span>
+              <span>/</span>
+              <span className="text-amber-600 font-bold">Quotes (Takhmeena)</span>
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2.5">
+              <span className="p-2 rounded-2xl bg-amber-50 text-amber-600 border border-amber-100 shadow-sm">
+                <FileText className="w-6 h-6" />
+              </span>
+              Takhmeena Quotation Builder
+            </h1>
+          </div>
         </div>
-      </header>
+
+        <div className="flex items-center gap-2">
+          <Link 
+            href="/erp" 
+            className="px-4 py-2.5 rounded-2xl bg-white border border-slate-200/80 text-xs font-bold text-slate-700 hover:bg-slate-50 hover:text-amber-600 shadow-sm transition"
+          >
+            ERP Countertop POS
+          </Link>
+          <Link 
+            href="/inventory" 
+            className="px-4 py-2.5 rounded-2xl bg-white border border-slate-200/80 text-xs font-bold text-slate-700 hover:bg-slate-50 hover:text-amber-600 shadow-sm transition"
+          >
+            Inventory Stock
+          </Link>
+        </div>
+      </div>
 
       {/* BUILDER UI - Hidden in Print */}
       {!isPrinting && (
-        <div className="p-4 max-w-4xl w-full mx-auto flex flex-col gap-6 mt-4 print:hidden">
-          <div className="bg-slate-900 rounded-3xl p-6 shadow-2xl border border-slate-800">
+        <div className="max-w-5xl w-full mx-auto flex flex-col gap-6 print:hidden">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-slate-200/80">
             
-            <div className="bg-amber-900/30 border border-amber-500/30 text-amber-200 p-4 rounded-xl mb-6 flex gap-3 items-center">
-              <Sparkles className="w-6 h-6 shrink-0" />
-              <p className="text-sm">Estimates generated here <b>do not</b> affect your inventory, revenue, or Khata. They are strictly for quoting prices to customers.</p>
+            {/* Informational Alert */}
+            <div className="bg-amber-50/80 border border-amber-200/80 text-amber-900 p-4 rounded-2xl mb-6 flex gap-3 items-center shadow-xs">
+              <Sparkles className="w-5 h-5 text-amber-600 shrink-0" />
+              <p className="text-xs sm:text-sm font-medium">
+                Estimates generated here <b>do not affect your inventory stock, revenue ledger, or Khata balances</b>. They are strictly draft quotations to issue to clients before an order is placed.
+              </p>
             </div>
 
             {/* Product Search */}
             <div className="relative mb-6">
-              <Search className="absolute left-3 top-3.5 w-5 h-5 text-slate-500" />
-              <input 
-                type="text" 
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                placeholder="Search inventory to add to quote..."
-                className="w-full bg-slate-950 border border-slate-800 rounded-2xl py-3 pl-10 pr-4 text-white focus:border-amber-500 outline-none transition-colors"
-              />
+              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1.5">
+                Add Items from Inventory
+              </label>
+              <div className="relative">
+                <Search className="absolute left-3.5 top-3.5 w-4 h-4 text-slate-400" />
+                <input 
+                  type="text" 
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  placeholder="Search catalog by product name or SKU..."
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-3 pl-10 pr-4 text-sm text-slate-900 placeholder:text-slate-400 font-medium focus:bg-white focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 outline-none transition-all"
+                />
+              </div>
               
               {searchQuery && (
-                <div className="absolute top-full left-0 right-0 mt-2 bg-slate-800 border border-slate-700 rounded-2xl overflow-hidden shadow-2xl z-20">
+                <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-200/90 rounded-2xl overflow-hidden shadow-xl z-30 divide-y divide-slate-100">
                   {filteredProducts.map(p => (
                     <button 
                       key={p.id}
+                      type="button"
                       onClick={() => addToCart(p)}
-                      className="w-full text-left px-4 py-3 hover:bg-slate-700 border-b border-slate-700 last:border-0 flex justify-between items-center"
+                      className="w-full text-left px-4 py-3 hover:bg-slate-50 flex justify-between items-center transition-colors group"
                     >
-                      <span className="font-semibold text-white">{p.name}</span>
-                      <span className="text-amber-400 font-bold">Rs {p.price}</span>
+                      <div className="flex flex-col">
+                        <span className="font-bold text-sm text-slate-800 group-hover:text-amber-600 transition-colors">{p.name}</span>
+                        {p.sku && <span className="text-xs text-slate-400">SKU: {p.sku}</span>}
+                      </div>
+                      <span className="text-amber-600 font-black text-sm bg-amber-50 px-2.5 py-1 rounded-xl group-hover:bg-amber-600 group-hover:text-white transition-all">
+                        Rs {(Number(p.price) || Number(p.sellingPrice) || 0).toLocaleString()}
+                      </span>
                     </button>
                   ))}
+                  {filteredProducts.length === 0 && (
+                    <div className="p-4 text-center text-slate-400 text-xs">
+                      No matching products in catalog
+                    </div>
+                  )}
                 </div>
               )}
+
+              {/* Custom Item Adder */}
+              <div className="flex flex-col sm:flex-row gap-2.5 mt-3 p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl items-center">
+                <input
+                  type="text"
+                  value={customItemName}
+                  onChange={e => setCustomItemName(e.target.value)}
+                  placeholder="Custom Item / Service (e.g. On-site Labor, Transport Delivery)..."
+                  className="flex-1 w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-900 placeholder:text-slate-400 outline-none focus:border-amber-500 shadow-xs"
+                />
+                <input
+                  type="number"
+                  value={customItemPrice}
+                  onChange={e => setCustomItemPrice(e.target.value)}
+                  placeholder="Estimated Price (Rs)"
+                  className="w-full sm:w-36 bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-900 placeholder:text-slate-400 outline-none focus:border-amber-500 shadow-xs text-right"
+                />
+                <button
+                  type="button"
+                  onClick={addCustomItem}
+                  className="w-full sm:w-auto bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all shadow-xs shrink-0 flex items-center justify-center gap-1.5"
+                >
+                  <Plus className="w-4 h-4" /> Add Line Item
+                </button>
+              </div>
             </div>
 
             {/* Cart Items */}
-            <div className="flex flex-col gap-2 min-h-[150px] mb-6">
+            <div className="flex flex-col gap-2.5 min-h-[160px] max-h-[360px] overflow-y-auto mb-6 p-1">
               {cart.length === 0 ? (
-                <div className="flex-1 flex flex-col items-center justify-center text-slate-600">
-                  <Package className="w-10 h-10 mb-2 opacity-50" />
-                  <p className="text-sm">Quote is empty</p>
+                <div className="flex-1 flex flex-col items-center justify-center text-slate-400 py-12 border-2 border-dashed border-slate-200/80 rounded-2xl">
+                  <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mb-2">
+                    <Package className="w-6 h-6" />
+                  </div>
+                  <p className="text-sm font-bold text-slate-600">No items added to quotation yet</p>
+                  <p className="text-xs text-slate-400 mt-0.5">Select products from inventory or type a custom fee above</p>
                 </div>
               ) : (
                 cart.map(item => (
-                  <div key={item.productId} className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex justify-between items-center">
-                    <div>
-                      <p className="font-bold text-white text-sm">{item.name}</p>
-                      <p className="text-xs text-slate-500">{item.quantity} x Rs {item.unitPrice}</p>
+                  <div 
+                    key={item.productId} 
+                    className="bg-slate-50/80 border border-slate-200/80 p-3.5 rounded-2xl flex justify-between items-center gap-3 hover:bg-slate-50 transition-colors"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-slate-900 text-sm truncate">{item.name}</p>
+                      <p className="text-xs text-slate-500 font-medium">Rs {item.unitPrice.toLocaleString()} each</p>
                     </div>
-                    <div className="flex items-center gap-4">
-                      <p className="font-bold text-amber-400">Rs {item.total}</p>
-                      <button onClick={() => removeFromCart(item.productId)} className="text-rose-500 hover:bg-rose-500/20 p-1.5 rounded-lg transition-colors">
+
+                    <div className="flex items-center gap-2.5 shrink-0">
+                      <div className="flex items-center bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+                        <button
+                          type="button"
+                          onClick={() => updateQuantity(item.productId, -1)}
+                          className="p-1.5 hover:bg-slate-100 text-slate-500 hover:text-slate-900 transition-colors"
+                          title="Decrease"
+                        >
+                          <Minus className="w-3.5 h-3.5" />
+                        </button>
+                        <span className="px-2 text-xs font-black text-slate-800 min-w-[24px] text-center">
+                          {item.quantity}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => updateQuantity(item.productId, 1)}
+                          className="p-1.5 hover:bg-slate-100 text-slate-500 hover:text-slate-900 transition-colors"
+                          title="Increase"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      <p className="font-black text-slate-900 text-sm min-w-[75px] text-right">
+                        Rs {item.total.toLocaleString()}
+                      </p>
+
+                      <button 
+                        type="button"
+                        onClick={() => removeFromCart(item.productId)} 
+                        className="text-slate-400 hover:text-rose-600 hover:bg-rose-50 p-1.5 rounded-xl transition-colors"
+                        title="Remove"
+                      >
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
@@ -135,45 +292,68 @@ export default function QuoteBuilderPage() {
               )}
             </div>
 
-            {/* Customer & Totals */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Quote For (Customer)</label>
-                <select 
-                  value={selectedCustomerId} 
-                  onChange={e => setSelectedCustomerId(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm text-white focus:border-amber-500 outline-none"
-                >
-                  <option value="">Walk-in / Unknown</option>
-                  {customers.map(c => <option key={c.id} value={c.syncId}>{c.name}</option>)}
-                </select>
+            {/* Customer & Totals Breakdown */}
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
+              <div className="md:col-span-6 flex flex-col gap-4">
+                <div>
+                  <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1.5">
+                    Quotation Prepared For (Customer)
+                  </label>
+                  <select 
+                    value={selectedCustomerId} 
+                    onChange={e => setSelectedCustomerId(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-semibold text-slate-900 focus:bg-white focus:border-amber-500 outline-none transition-all cursor-pointer"
+                  >
+                    <option value="">Walk-in Customer / Prospect</option>
+                    {customers.map(c => (
+                      <option key={c.id} value={c.syncId}>
+                        {c.name} {c.phone ? `(${c.phone})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 
-                <label className="text-xs font-bold text-slate-500 uppercase block mb-1 mt-4">Discount (Rs)</label>
-                <input 
-                  type="number" 
-                  value={discount} 
-                  onChange={e => setDiscount(Number(e.target.value))}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm text-white focus:border-amber-500 outline-none"
-                />
+                <div>
+                  <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1.5">
+                    Proposed Discount (Rs)
+                  </label>
+                  <input 
+                    type="number" 
+                    min="0"
+                    value={discount} 
+                    onChange={e => setDiscount(Math.max(0, Number(e.target.value)))}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-bold text-slate-900 focus:bg-white focus:border-amber-500 outline-none transition-all"
+                  />
+                </div>
               </div>
 
-              <div className="bg-gradient-to-br from-amber-900/40 to-orange-900/40 border border-amber-500/30 p-5 rounded-2xl flex flex-col justify-between">
+              <div className="md:col-span-6 bg-slate-50 border border-slate-200/90 p-5 rounded-2xl flex flex-col justify-between">
                 <div>
-                  <div className="flex justify-between items-center mb-2 text-sm text-slate-300">
-                    <span>Subtotal</span><span>Rs {subtotal.toLocaleString()}</span>
+                  <div className="flex justify-between items-center mb-2 text-xs text-slate-600 font-medium">
+                    <span>Subtotal</span>
+                    <span className="font-bold text-slate-800">Rs {subtotal.toLocaleString()}</span>
                   </div>
-                  <div className="flex justify-between items-center border-t border-amber-500/30 pt-4 mb-4">
-                    <span className="font-bold text-white text-lg">Total Estimate</span>
-                    <span className="font-black text-2xl text-amber-400">Rs {finalTotal.toLocaleString()}</span>
+                  {discount > 0 && (
+                    <div className="flex justify-between items-center mb-2 text-xs text-rose-600 font-medium">
+                      <span>Discount</span>
+                      <span className="font-bold">- Rs {discount.toLocaleString()}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center border-t border-slate-200 pt-3 mb-4">
+                    <span className="font-black text-slate-900 text-base">Total Estimate</span>
+                    <span className="font-black text-2xl text-amber-600">
+                      Rs {finalTotal.toLocaleString()}
+                    </span>
                   </div>
                 </div>
 
                 <button 
+                  type="button"
                   onClick={handlePrintQuote}
                   disabled={cart.length === 0}
-                  className="w-full bg-amber-600 hover:bg-amber-500 text-white font-black text-lg py-4 rounded-xl shadow-[0_0_20px_rgba(217,119,6,0.3)] hover:shadow-[0_0_30px_rgba(217,119,6,0.5)] transition-all disabled:opacity-50 disabled:shadow-none flex items-center justify-center gap-2"
+                  className="w-full bg-amber-600 hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-black text-sm py-4 rounded-2xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2"
                 >
-                  <Printer className="w-6 h-6" /> PRINT QUOTATION
+                  <Printer className="w-5 h-5" /> PRINT OFFICIAL QUOTATION
                 </button>
               </div>
             </div>

@@ -6,13 +6,14 @@ import bcrypt from 'bcryptjs';
 import Link from 'next/link';
 import { useAuthStore } from '@/store/authStore';
 import BannedScreen from '@/components/BannedScreen';
-import { Sparkles, Loader2 } from 'lucide-react';
+import { Sparkles, Loader2, Eye, EyeOff } from 'lucide-react';
 
 import { normalizeEmail } from '@/lib/utils';
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isBanned, setIsBanned] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -196,15 +197,24 @@ export default function Login() {
                 onChange={(e) => setEmail(e.target.value)}
               />
             </div>
-            <div>
+            <div className="relative">
               <label className="block text-xs font-bold text-gray-500 mb-1.5">Password</label>
-              <input
-                type="password"
-                required
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  required
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors focus:outline-none"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
             <button
               type="submit"

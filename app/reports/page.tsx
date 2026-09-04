@@ -1,57 +1,56 @@
-﻿'use client';
+'use client';
 
 import { useState, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
-import { FileText, Printer, Download, ArrowLeft, Building2, Store, Users } from 'lucide-react';
+import { ArrowLeft, Download, Printer, FileText, Building2, Store, Users } from 'lucide-react';
 import Link from 'next/link';
 
 export default function ReportsPage() {
   const [activeTab, setActiveTab] = useState<'SALES' | 'KHATA' | 'PAYROLL'>('SALES');
 
-  // Queries
-  const invoices = useLiveQuery(() => db.invoices.toArray(), []) || [];
-  const customers = useLiveQuery(() => db.khataCustomers.filter(c => !c.isDeleted).toArray(), []) || [];
-  const khataTxns = useLiveQuery(() => db.khataTransactions.filter(t => !t.isDeleted).toArray(), []) || [];
-  const employees = useLiveQuery(() => db.employees.filter(e => e.isActive).toArray(), []) || [];
-  const advances = useLiveQuery(() => db.advances.filter(a => !a.isDeducted).toArray(), []) || [];
-  const attendances = useLiveQuery(() => db.attendance.toArray(), []) || [];
+  // Load Data
+  const invoices = useLiveQuery(() => db.invoices.filter(i => !i.isDeleted).toArray()) || [];
+  const khataCustomers = useLiveQuery(() => db.khataCustomers.filter(c => !c.isDeleted).toArray()) || [];
+  const employees = useLiveQuery(() => db.employees.filter(e => !e.isDeleted).toArray()) || [];
+  const attendances = useLiveQuery(() => db.attendance.filter(a => !a.isDeleted).toArray()) || [];
+  const advances = useLiveQuery(() => db.advances.filter(a => !a.isDeleted).toArray()) || [];
 
-  // --- 1. SALES DATA ---
+  // --- SALES SUMMARY ---
   const salesData = useMemo(() => {
-    return invoices.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    return invoices.map(inv => ({
+      id: inv.id,
+      invoiceNumber: inv.invoiceNumber,
+      date: inv.date,
+      customerName: inv.customerName,
+      paymentMethod: inv.paymentMethod,
+      subtotal: inv.subtotal,
+      discount: inv.discount,
+      total: inv.total
+    }));
   }, [invoices]);
 
-  // --- 2. KHATA DATA ---
+  // --- KHATA SUMMARY ---
   const khataData = useMemo(() => {
-    return customers.map(c => {
-      let balance = Number(c.openingBalance || 0);
-      const customerTxns = khataTxns.filter(t => t.customerId === c.syncId);
-      customerTxns.forEach(t => {
-        if (t.type === 'CREDIT') balance += Number(t.amount);
-        if (t.type === 'DEBIT') balance -= Number(t.amount);
-      });
-      return { ...c, balance };
-    }).sort((a, b) => b.balance - a.balance); // Highest credit first
-  }, [customers, khataTxns]);
+    return khataCustomers.map(c => ({
+      id: c.id,
+      name: c.name,
+      phone: c.phone,
+      balance: c.balance || 0,
+      customerType: c.customerType || 'PERSON'
+    }));
+  }, [khataCustomers]);
 
-  // --- 3. PAYROLL DATA (Current Month) ---
+  // --- PAYROLL SUMMARY ---
   const payrollData = useMemo(() => {
-    const todayStr = new Date().toISOString().split('T')[0];
-    const currentMonthStr = todayStr.substring(0, 7);
-    const monthAttendances = attendances.filter(a => a.date.startsWith(currentMonthStr));
-
     return employees.map(emp => {
-      const empAtt = monthAttendances.filter(a => a.employeeId === emp.syncId);
-      const absents = empAtt.filter(a => a.status === 'ABSENT').length;
-      const halfDays = empAtt.filter(a => a.status === 'HALF_DAY').length;
+      const empAttendances = attendances.filter(a => a.employeeId === emp.syncId);
+      const absents = empAttendances.filter(a => a.status === 'ABSENT').length;
+      const empAdvances = advances.filter(adv => adv.employeeId === emp.syncId);
+      const peshgi = empAdvances.reduce((sum, adv) => sum + adv.amount, 0);
       
       const perDaySalary = emp.baseSalary / 30;
-      const deduction = (absents * perDaySalary) + (halfDays * (perDaySalary / 2));
-      
-      const empAdvances = advances.filter(a => a.employeeId === emp.syncId);
-      const peshgi = empAdvances.reduce((sum, a) => sum + a.amount, 0);
-
+      const deduction = absents * perDaySalary;
       const netSalary = Math.max(0, emp.baseSalary - deduction - peshgi);
 
       return {
@@ -69,8 +68,8 @@ export default function ReportsPage() {
   const downloadCSV = (filename: string, headers: string[], rows: any[][]) => {
     const csvContent = [
       headers.join(","),
-      ...rows.map(row => row.map(cell => \"\"\).join(","))
-    ].join("\\n");
+      ...rows.map(row => row.map(cell => `"${(cell ?? '').toString().replace(/"/g, '""')}"`).join(","))
+    ].join("\n");
     
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -94,7 +93,7 @@ export default function ReportsPage() {
         inv.discount.toString(),
         inv.total.toString()
       ]);
-      downloadCSV(\sales_report_\.csv\, ['Invoice #', 'Date', 'Customer', 'Method', 'Subtotal', 'Discount', 'Total'], rows);
+      downloadCSV(`sales_report_${dateStamp}.csv`, ['Invoice #', 'Date', 'Customer', 'Method', 'Subtotal', 'Discount', 'Total'], rows);
     } else if (activeTab === 'KHATA') {
       const rows = khataData.map(c => [
         c.name,
@@ -102,7 +101,7 @@ export default function ReportsPage() {
         c.customerType,
         c.balance.toString()
       ]);
-      downloadCSV(\khata_report_\.csv\, ['Customer Name', 'Phone', 'Type', 'Net Balance (Rs)'], rows);
+      downloadCSV(`khata_report_${dateStamp}.csv`, ['Customer Name', 'Phone', 'Type', 'Net Balance (Rs)'], rows);
     } else if (activeTab === 'PAYROLL') {
       const rows = payrollData.map(p => [
         p.name,
@@ -112,7 +111,7 @@ export default function ReportsPage() {
         p.peshgi.toString(),
         p.netSalary.toString()
       ]);
-      downloadCSV(\payroll_report_\.csv\, ['Employee Name', 'Role', 'Base Salary', 'Absents', 'Peshgi Deducted', 'Net Payable'], rows);
+      downloadCSV(`payroll_report_${dateStamp}.csv`, ['Employee Name', 'Role', 'Base Salary', 'Absents', 'Peshgi Deducted', 'Net Payable'], rows);
     }
   };
 
@@ -124,7 +123,7 @@ export default function ReportsPage() {
     <main className="flex-1 flex flex-col bg-slate-50 min-h-screen print:bg-white">
       
       {/* Header (Hidden on Print) */}
-      <header className="bg-white border-b border-slate-200 p-4 sticky top-0 z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4 print:hidden">
+      <div className="bg-white border-b border-slate-200 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 print:hidden">
         <div className="flex items-center gap-3">
           <Link href="/" className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
             <ArrowLeft className="w-5 h-5 text-slate-600" />
@@ -135,13 +134,28 @@ export default function ReportsPage() {
         </div>
 
         <div className="flex bg-slate-100 p-1 rounded-xl">
-          <button onClick={() => setActiveTab('SALES')} className={\px-4 py-2 text-sm font-bold rounded-lg transition-colors flex items-center gap-2 \\}>
+          <button 
+            onClick={() => setActiveTab('SALES')} 
+            className={`px-4 py-2 text-sm font-bold rounded-lg transition-colors flex items-center gap-2 ${
+              activeTab === 'SALES' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-200'
+            }`}
+          >
             <Building2 className="w-4 h-4" /> ERP Sales
           </button>
-          <button onClick={() => setActiveTab('KHATA')} className={\px-4 py-2 text-sm font-bold rounded-lg transition-colors flex items-center gap-2 \\}>
+          <button 
+            onClick={() => setActiveTab('KHATA')} 
+            className={`px-4 py-2 text-sm font-bold rounded-lg transition-colors flex items-center gap-2 ${
+              activeTab === 'KHATA' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-200'
+            }`}
+          >
             <Store className="w-4 h-4" /> Khata
           </button>
-          <button onClick={() => setActiveTab('PAYROLL')} className={\px-4 py-2 text-sm font-bold rounded-lg transition-colors flex items-center gap-2 \\}>
+          <button 
+            onClick={() => setActiveTab('PAYROLL')} 
+            className={`px-4 py-2 text-sm font-bold rounded-lg transition-colors flex items-center gap-2 ${
+              activeTab === 'PAYROLL' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-200'
+            }`}
+          >
             <Users className="w-4 h-4" /> Payroll
           </button>
         </div>
@@ -154,7 +168,7 @@ export default function ReportsPage() {
             <Printer className="w-4 h-4" /> Print PDF
           </button>
         </div>
-      </header>
+      </div>
 
       {/* Printable Report Area */}
       <div className="p-4 lg:p-8 max-w-6xl w-full mx-auto print:p-0 print:max-w-none">
@@ -229,8 +243,8 @@ export default function ReportsPage() {
                       <td className="p-4 font-bold text-slate-800">{c.name}</td>
                       <td className="p-4 text-slate-600">{c.phone || '-'}</td>
                       <td className="p-4 text-slate-600">{c.customerType}</td>
-                      <td className={\p-4 font-bold text-right \\}>
-                        {c.balance > 0 ? \Rs \ (Gives)\ : c.balance < 0 ? \Rs \ (Advance)\ : 'Cleared'}
+                      <td className={`p-4 font-bold text-right ${c.balance > 0 ? 'text-rose-600' : c.balance < 0 ? 'text-emerald-600' : 'text-slate-500'}`}>
+                        {c.balance > 0 ? `Rs ${c.balance.toLocaleString()} (Pending)` : c.balance < 0 ? `Rs ${Math.abs(c.balance).toLocaleString()} (Advance)` : 'Cleared'}
                       </td>
                     </tr>
                   ))

@@ -3,8 +3,7 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
 import { useParams, useRouter } from 'next/navigation';
-import { Printer, MessageCircle, ArrowLeft, Sparkles, Receipt } from 'lucide-react';
-import Link from 'next/link';
+import { Printer, MessageCircle, ArrowLeft, Sparkles } from 'lucide-react';
 
 export default function InvoicePrintPage() {
   const params = useParams();
@@ -26,9 +25,9 @@ export default function InvoicePrintPage() {
   };
 
   const handleWhatsApp = () => {
-    const itemsText = invoice.items.map(i => \- \ (x\) = Rs \\).join('%0A');
-    const msg = \*RECEIPT - \*%0A%0ATotal: *Rs \*%0A%0AItems:%0A\%0A%0AThank you for your business!\;
-    window.open(\https://wa.me/?text=\\, '_blank');
+    const itemsText = invoice.items.map(i => `- ${i.name} (x${i.quantity}) = Rs ${i.total}`).join('%0A');
+    const msg = `*RECEIPT - ${invoice.invoiceNumber}*%0A%0ATotal: *Rs ${invoice.total}*%0A%0AItems:%0A${itemsText}%0A%0AThank you for your business!`;
+    window.open(`https://wa.me/?text=${msg}`, '_blank');
   };
 
   return (

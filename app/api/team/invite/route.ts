@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { db } from '../../../../lib/db.server';
-import { requireAuth } from '../../../../lib/auth/jwtAuth';
+import { requireOwner } from '../../../../lib/auth/moduleGate';
 import { normalizeEmail } from '../../../../lib/utils';
 
 export async function POST(req: NextRequest) {
-  const auth = await requireAuth(req);
-  if (!auth.ok) {
-    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  const ownerAuth = await requireOwner(req);
+  if (!ownerAuth.ok) {
+    return ownerAuth.response;
   }
 
   const { email, password, fullName } = await req.json();
@@ -18,12 +18,10 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // Only the actual caller's own membership matters here (not the org-resolved id),
-    // since inviting is an owner-only action - a member must never be able to invite.
-    const callerRow = await db.query('SELECT org_role, organization_id FROM users WHERE id = $1', [auth.user.actualUserId]);
+    const callerRow = await db.query('SELECT org_role, organization_id FROM users WHERE id = $1', [ownerAuth.actualUserId]);
     const caller = callerRow.rows[0];
-    if (!caller?.organization_id || caller.org_role !== 'OWNER') {
-      return NextResponse.json({ error: 'Only the organization owner can invite team members' }, { status: 403 });
+    if (!caller?.organization_id) {
+      return NextResponse.json({ error: 'Organization not found. Please create or configure your organization first.' }, { status: 400 });
     }
 
     const existing = await db.query('SELECT id FROM users WHERE email = $1', [cleanEmail]);

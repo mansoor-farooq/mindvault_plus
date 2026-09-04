@@ -1,5 +1,5 @@
-﻿import { db } from '../db.server';
-import { FREE_LIMITS } from '../config/gatingConfig';
+import { db } from '../db.server';
+import { FREE_LIMITS, STARTER_LIMITS, PRO_LIMITS } from '../config/gatingConfig';
 import { AI_TIER_LIMITS, PlanTier } from '../config/aiConfig';
 
 interface CheckLimitResult {
@@ -18,18 +18,22 @@ class GatingService {
   /**
    * Checks if a user is allowed to create a new record for a given feature.
    * NOTE: This should ONLY be called for NEW inserts. Existing records (updates) bypass this.
-   *
-   * `licenseExpiry` matters because nothing else in the system ever re-checks it: an
-   * expired PRO grant (license_type still 'PRO' in the DB until the daily downgrade
-   * cron runs) must not keep bypassing quota limits in the meantime.
    */
   async checkLimit(userId: number, licenseType: string, featureKey: string, licenseExpiry: string | Date | null = null): Promise<CheckLimitResult> {
-    const isExpiredPro = licenseType === 'PRO' && licenseExpiry && new Date(licenseExpiry) < new Date();
-    if ((licenseType === 'PRO' && !isExpiredPro) || licenseType === 'LIFETIME') {
+    const isExpired = (licenseType === 'STARTER' || licenseType === 'PRO' || licenseType === 'PRO_PLUS') && licenseExpiry && new Date(licenseExpiry) < new Date();
+    
+    if (!isExpired && (licenseType === 'PRO_PLUS' || licenseType === 'UNLIMITED' || licenseType === 'LIFETIME')) {
       return { allowed: true, limit: Infinity, active: 0, bonus: 0 };
     }
 
-    const freeLimit = FREE_LIMITS[featureKey] || 0;
+    let baseLimit = FREE_LIMITS[featureKey] || 0;
+    if (!isExpired) {
+      if (licenseType === 'STARTER') {
+        baseLimit = STARTER_LIMITS[featureKey] || baseLimit;
+      } else if (licenseType === 'PRO') {
+        baseLimit = PRO_LIMITS[featureKey] || baseLimit;
+      }
+    }
 
     const usageResult = await db.query(
       'SELECT bonus_quota FROM feature_usage WHERE user_id = $1 AND feature_key = $2',
@@ -52,7 +56,7 @@ class GatingService {
       activeCount = parseInt(result.rows[0].count, 10);
     }
 
-    const totalLimit = freeLimit + bonusQuota;
+    const totalLimit = baseLimit + bonusQuota;
     const allowed = activeCount < totalLimit;
 
     return {

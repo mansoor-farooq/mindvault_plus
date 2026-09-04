@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
 import { SyncService } from '@/services/SyncService';
-import { ArrowLeft, PiggyBank, Plus, Target, CheckCircle2, TrendingUp, Search } from 'lucide-react';
+import { ArrowLeft, PiggyBank, Plus, Target, CheckCircle2, TrendingUp, Trash2, ArrowDownLeft } from 'lucide-react';
 import Link from 'next/link';
 import Confetti from 'react-confetti';
 
@@ -18,7 +18,7 @@ export default function GulluckPage() {
 
   const [showConfetti, setShowConfetti] = useState(false);
 
-  const gullucks = useLiveQuery(() => db.gullucks.reverse().toArray(), []) || [];
+  const gullucks = useLiveQuery(() => db.gullucks.filter(g => !g.isDeleted).reverse().toArray(), []) || [];
 
   const handleCreateGulluck = async () => {
     if (!name || !targetAmount) return;
@@ -27,7 +27,8 @@ export default function GulluckPage() {
       name,
       targetAmount: Number(targetAmount),
       savedAmount: 0,
-      createdAt: new Date()
+      isDeleted: false,
+      createdAt: new Date().toISOString()
     });
     SyncService.sync();
     setShowAddModal(false);
@@ -50,11 +51,26 @@ export default function GulluckPage() {
     setAddAmount('');
   };
 
+  const handleWithdrawMoney = async (id: number, currentSaved: number) => {
+    if (currentSaved <= 0) return alert('No funds in this Gulluck to withdraw!');
+    if (!confirm(`Are you sure you want to withdraw all Rs ${currentSaved.toLocaleString()} from this savings goal?`)) return;
+    await db.gullucks.update(id, { savedAmount: 0 });
+    SyncService.sync();
+  };
+
+  const handleDeleteGulluck = async (id: number) => {
+    if (!confirm('Are you sure you want to delete this Gulluck goal?')) return;
+    await db.gullucks.update(id, { isDeleted: true, deletedAt: new Date().toISOString() });
+    SyncService.sync();
+  };
+
   return (
     <main className="flex-1 flex flex-col bg-slate-50 min-h-screen pb-20 relative overflow-hidden">
-      {showConfetti && <Confetti width={window.innerWidth} height={window.innerHeight} recycle={false} />}
+      {showConfetti && typeof window !== 'undefined' && (
+        <Confetti width={window.innerWidth} height={window.innerHeight} recycle={false} />
+      )}
       
-      <header className="bg-gradient-to-r from-rose-500 to-pink-600 text-white p-4 shadow-lg sticky top-0 z-10 flex justify-between items-center">
+      <div className="bg-gradient-to-r from-rose-500 to-pink-600 text-white p-4 shadow-lg flex justify-between items-center shrink-0">
         <div className="flex items-center gap-3">
           <Link href="/" className="p-2 hover:bg-white/15 rounded-full transition-colors">
             <ArrowLeft className="w-6 h-6" />
@@ -66,13 +82,13 @@ export default function GulluckPage() {
         <button onClick={() => setShowAddModal(true)} className="p-2 bg-white/20 hover:bg-white/30 rounded-full transition-colors">
           <Plus className="w-5 h-5" />
         </button>
-      </header>
+      </div>
 
       <div className="p-4 max-w-4xl w-full mx-auto flex flex-col gap-6 mt-4">
         
         {/* Intro Widget */}
         <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-100 flex flex-col sm:flex-row items-center gap-6 justify-between relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-pink-100 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+          <div className="absolute top-0 right-0 w-64 h-64 bg-pink-100 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
           <div className="relative z-10">
             <h2 className="text-2xl font-black text-slate-800 tracking-tight">Save for your dreams.</h2>
             <p className="text-slate-500 mt-2">Break down big purchases into small, achievable savings goals.</p>
@@ -110,8 +126,18 @@ export default function GulluckPage() {
                         <Target className="w-3 h-3" /> Target: Rs {goal.targetAmount.toLocaleString()}
                       </p>
                     </div>
-                    <div className="w-12 h-12 rounded-full bg-rose-50 flex items-center justify-center text-rose-500 shrink-0">
-                      <PiggyBank className="w-6 h-6" />
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteGulluck(goal.id!)}
+                        className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors"
+                        title="Delete Gulluck"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                      <div className="w-12 h-12 rounded-full bg-rose-50 flex items-center justify-center text-rose-500 shrink-0">
+                        <PiggyBank className="w-6 h-6" />
+                      </div>
                     </div>
                   </div>
 
@@ -123,8 +149,10 @@ export default function GulluckPage() {
                     </div>
                     <div className="w-full bg-slate-100 h-4 rounded-full overflow-hidden relative">
                       <div 
-                        className={\bsolute top-0 left-0 h-full rounded-full transition-all duration-1000 \\}
-                        style={{ width: \\%\ }}
+                        className={`absolute top-0 left-0 h-full rounded-full transition-all duration-1000 bg-gradient-to-r ${
+                          isComplete ? 'from-emerald-500 to-teal-400' : 'from-rose-500 to-pink-500'
+                        }`}
+                        style={{ width: `${progress}%` }}
                       ></div>
                     </div>
                   </div>
@@ -143,13 +171,25 @@ export default function GulluckPage() {
                         <button onClick={() => setShowAddMoneyId(null)} className="bg-slate-100 text-slate-500 px-3 rounded-xl font-bold text-sm">X</button>
                       </div>
                     ) : (
-                      <button 
-                        onClick={() => setShowAddMoneyId(goal.syncId!)}
-                        disabled={isComplete}
-                        className="w-full bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-600 font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:hover:bg-slate-100 disabled:hover:text-slate-600"
-                      >
-                        <TrendingUp className="w-4 h-4" /> Deposit Savings
-                      </button>
+                      <div className="flex w-full gap-2">
+                        <button 
+                          onClick={() => setShowAddMoneyId(goal.syncId!)}
+                          disabled={isComplete}
+                          className="flex-1 bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-600 font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:hover:bg-slate-100 disabled:hover:text-slate-600 text-sm"
+                        >
+                          <TrendingUp className="w-4 h-4" /> Deposit
+                        </button>
+                        {goal.savedAmount > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => handleWithdrawMoney(goal.id!, goal.savedAmount)}
+                            className="bg-amber-50 hover:bg-amber-100 text-amber-700 font-bold px-3 py-3 rounded-xl flex items-center justify-center gap-1 transition-colors text-xs"
+                            title="Withdraw Funds"
+                          >
+                            <ArrowDownLeft className="w-4 h-4" /> Withdraw
+                          </button>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>
@@ -178,8 +218,8 @@ export default function GulluckPage() {
             </div>
 
             <div className="flex gap-3 mt-4">
-              <button onClick={() => setShowAddModal(false)} className="flex-1 py-4 font-bold text-slate-600 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors">Cancel</button>
-              <button onClick={handleCreateGulluck} className="flex-1 py-4 font-bold text-white bg-rose-500 rounded-xl shadow-lg shadow-rose-200 hover:bg-rose-600 transition-colors">Start Saving</button>
+              <button onClick={() => setShowAddModal(false)} className="flex-1 py-4 font-bold text-slate-600 bg-slate-100 rounded-xl">Cancel</button>
+              <button onClick={handleCreateGulluck} className="flex-1 py-4 font-bold text-white bg-rose-500 rounded-xl shadow-lg shadow-rose-200">Start Saving</button>
             </div>
           </div>
         </div>

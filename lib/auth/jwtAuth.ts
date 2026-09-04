@@ -34,7 +34,7 @@ export async function requireAuth(req: NextRequest): Promise<AuthResult | AuthEr
     const decoded = jwt.verify(token, JWT_SECRET) as { id: number; [key: string]: unknown };
 
     // Live DB check on every protected API call - DO NOT trust cached JWT status
-    const result = await db.query('SELECT id, account_status, organization_id, org_role FROM users WHERE id = $1', [decoded.id]);
+    const result = await db.query('SELECT id, account_status, organization_id, org_role, role_updated_at, role_version FROM users WHERE id = $1', [decoded.id]);
     if (result.rows.length === 0) {
       return { ok: false, status: 401, error: 'User no longer exists' };
     }
@@ -56,7 +56,17 @@ export async function requireAuth(req: NextRequest): Promise<AuthResult | AuthEr
       }
     }
 
-    return { ok: true, user: { ...decoded, id: effectiveId, actualUserId: decoded.id } };
+    return { 
+      ok: true, 
+      user: { 
+        ...decoded, 
+        id: effectiveId, 
+        actualUserId: decoded.id,
+        org_role: user.org_role,
+        roleUpdatedAt: user.role_updated_at ? new Date(user.role_updated_at).getTime() : null,
+        roleVersion: Number(user.role_version) || 1
+      } 
+    };
   } catch {
     return { ok: false, status: 401, error: 'Token is not valid' };
   }

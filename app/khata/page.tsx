@@ -1,15 +1,15 @@
-﻿"use client";
+"use client";
 
-import { Sparkles, useState, useMemo } from 'react';
-import { Sparkles, useLiveQuery } from 'dexie-react-hooks';
-import { Sparkles, db, KhataCustomer, KhataTransaction } from '@/lib/db';
-import { Sparkles, 
+import { useState, useMemo } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db, KhataCustomer, KhataTransaction } from '@/lib/db';
+import { 
   ArrowLeft, Plus, User as UserIcon, Phone, MapPin, Search, 
   MessageCircle, ArrowUpRight, ArrowDownLeft, X, Trash2, Printer, 
-  Store, Calendar, DollarSign, Filter, CheckCircle2, AlertCircle, RefreshCw, Package
+  Store, Calendar, DollarSign, Filter, CheckCircle2, AlertCircle, RefreshCw, Package, Sparkles
 } from 'lucide-react';
 import Link from 'next/link';
-import { Sparkles, useAuthStore } from '@/store/authStore';
+import { useAuthStore } from '@/store/authStore';
 
 export default function KhataPage() {
   const { shopModeEnabled, toggleShopMode } = useAuthStore();
@@ -61,10 +61,10 @@ export default function KhataPage() {
     transactions.forEach(t => {
       if (balances[t.customerId]) {
         const amt = Number(t.amount);
-        if (t.type === 'CREDIT') {
+        if (t.type === 'CREDIT' || t.type === 'GIVEN') {
           balances[t.customerId].currentBalance += amt;
           balances[t.customerId].totalCredit += amt;
-        } else if (t.type === 'DEBIT') {
+        } else if (t.type === 'DEBIT' || t.type === 'RECEIVED') {
           balances[t.customerId].currentBalance -= amt;
           balances[t.customerId].totalReceived += amt;
         }
@@ -85,8 +85,8 @@ export default function KhataPage() {
     transactions.forEach(t => {
       const tDateStr = new Date(t.date).toISOString().split('T')[0];
       if (tDateStr === todayStr) {
-        if (t.type === 'CREDIT') creditToday += Number(t.amount);
-        if (t.type === 'DEBIT') receivedToday += Number(t.amount);
+        if (t.type === 'CREDIT' || t.type === 'GIVEN') creditToday += Number(t.amount);
+        if (t.type === 'DEBIT' || t.type === 'RECEIVED') receivedToday += Number(t.amount);
       }
     });
 
@@ -135,8 +135,8 @@ export default function KhataPage() {
     let runningBal = Number(selectedCustomer.openingBalance || 0);
     const ledger = rawTxns.map(t => {
       const amt = Number(t.amount);
-      if (t.type === 'CREDIT') runningBal += amt;
-      else if (t.type === 'DEBIT') runningBal -= amt;
+      if (t.type === 'CREDIT' || t.type === 'GIVEN') runningBal += amt;
+      else if (t.type === 'DEBIT' || t.type === 'RECEIVED') runningBal -= amt;
 
       const linkedProduct = products?.find(p => p.syncId === t.productId);
 

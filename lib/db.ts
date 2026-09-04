@@ -1,33 +1,33 @@
-﻿import Dexie, { type Table } from 'dexie';
+import Dexie, { type Table } from 'dexie';
 
 export interface User {
   companyCode?: string; // Tenant Isolation ID
   id?: number;
   fullName: string;
   email: string;
-  passwordHash: string; // Stored securely if needed locally, though mostly backend
-  pin?: string;         // Local app lock PIN (hashed)
+  passwordHash: string;
+  pin?: string;
   status?: 'ACTIVE' | 'BANNED';
-  companyCode?: string; // Multi-Tenant SaaS Tenant ID
-  license?: 'FREE' | 'PRO' | 'PRO_PLUS' | 'UNLIMITED';
+  role?: 'OWNER' | 'ADMIN' | 'MANAGER' | 'CASHIER';
+  license?: 'FREE' | 'STARTER' | 'PRO' | 'PRO_PLUS' | 'UNLIMITED' | 'LIFETIME';
+  licenseExpiry?: Date | string | null;
   country?: string;
   city?: string;
   religion?: 'muslim' | 'other' | 'prefer_not_to_say';
   namazRemindersEnabled?: boolean;
   businessType?: 'RETAIL_SHOP' | 'MANUFACTURING' | 'RESTAURANT' | 'WHOLESALE' | 'OTHER';
   accountType?: 'INDIVIDUAL' | 'ORGANIZATION';
-  organizationName?: string; // only used at registration time to create the org server-side
+  organizationName?: string;
   orgRole?: 'OWNER' | 'MEMBER';
-  createdAt: Date;
+  createdAt: Date | string;
 }
 
 export interface Note {
-  companyCode?: string; // Tenant Isolation ID
   id?: number;
   syncId?: string;
   title: string;
   description: string;
-  type: 'TEXT' | 'VOICE' | 'DOCUMENT';
+  type?: 'TEXT' | 'VOICE' | 'DOCUMENT';
   voicePath?: string;
   audioBlob?: Blob;
   fileBlob?: Blob;
@@ -35,12 +35,12 @@ export interface Note {
   category: string;
   tags: string[];
   summary?: string;
-  reminderDateTime?: Date;
-  createdAt: Date;
-  updatedAt: Date;
+  reminderDateTime?: Date | string;
+  createdAt: Date | string;
+  updatedAt: Date | string;
   isFavorite: boolean;
   isDeleted: boolean;
-  deletedAt?: Date;
+  deletedAt?: Date | string;
 }
 
 export interface Budget {
@@ -51,8 +51,8 @@ export interface Budget {
   limitAmount: number;
   month: string; // 'YYYY-MM'
   isDeleted: boolean;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: Date | string;
+  updatedAt: Date | string;
 }
 
 export interface Employee {
@@ -64,8 +64,9 @@ export interface Employee {
   phone: string;
   baseSalary: number; // Monthly fixed salary
   isActive: boolean;
-  createdAt: Date;
-  updatedAt: Date;
+  isDeleted?: boolean;
+  createdAt: Date | string;
+  updatedAt: Date | string;
 }
 
 export interface Attendance {
@@ -75,7 +76,9 @@ export interface Attendance {
   employeeId: string; // syncId of Employee
   date: string; // YYYY-MM-DD
   status: 'PRESENT' | 'ABSENT' | 'HALF_DAY';
-  createdAt: Date;
+  isDeleted?: boolean;
+  deletedAt?: Date | string;
+  createdAt: Date | string;
 }
 
 export interface Advance {
@@ -87,7 +90,9 @@ export interface Advance {
   date: string; // YYYY-MM-DD
   description: string;
   isDeducted: boolean; // True when settled in monthly salary
-  createdAt: Date;
+  isDeleted?: boolean;
+  deletedAt?: Date | string;
+  createdAt: Date | string;
 }
 
 export interface Kameti {
@@ -97,10 +102,15 @@ export interface Kameti {
   name: string;
   poolAmount: number;
   perMemberAmount: number;
-  memberCount: number;
+  memberCount: number; // For backwards compatibility, though now it's number of slots/duration
+  durationMonths: number;
+  drawDate?: number; // 1-31 (Date of the month)
+  status?: 'PENDING' | 'ACTIVE' | 'COMPLETED';
   startDate: string; // YYYY-MM-DD
-  members: string[]; // List of names in payout order
-  createdAt: Date;
+  members: string[]; // List of names in payout order (index = month - 1)
+  isDeleted?: boolean;
+  deletedAt?: Date | string;
+  createdAt: Date | string;
 }
 
 export interface KametiPayment {
@@ -111,7 +121,9 @@ export interface KametiPayment {
   memberName: string;
   monthNumber: number; // 1 to memberCount
   isPaid: boolean;
-  paidAt?: Date;
+  paidAt?: Date | string;
+  isDeleted?: boolean;
+  deletedAt?: Date | string;
 }
 
 export interface SaleSearchHistory {
@@ -123,7 +135,7 @@ export interface SaleSearchHistory {
   radiusKm: number;
   brand: string;
   category: string;
-  createdAt: Date;
+  createdAt: Date | string;
 }
 
 export interface ChatMessage {
@@ -133,7 +145,7 @@ export interface ChatMessage {
   noteId: string; // Refers to Note.syncId (mandatory FK)
   role: 'user' | 'assistant';
   content: string;
-  createdAt: Date;
+  createdAt: Date | string;
 }
 
 export interface Document {
@@ -161,7 +173,7 @@ export interface Annotation {
   pageNumber: number;
   highlightColor: string;
   noteText?: string;
-  createdAt: Date;
+  createdAt: Date | string;
 }
 
 export interface LedgerEntry {
@@ -172,21 +184,21 @@ export interface LedgerEntry {
   amount: number;
   category: string;
   note?: string;
-  date: Date;
+  date: Date | string;
   isRecurring: boolean;
   attachedPhotoPath?: string;
   attachedPhotoBlob?: Blob;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: Date | string;
+  updatedAt: Date | string;
   isDeleted: boolean;
-  deletedAt?: Date;
+  deletedAt?: Date | string;
 }
 
 export interface UdhaarPayment {
   companyCode?: string; // Tenant Isolation ID
   id: string; // unique string, e.g., Date.now().toString()
   amount: number;
-  date: Date;
+  date: Date | string;
   note?: string;
   proofPath?: string;
   proofBlob?: Blob;
@@ -199,14 +211,14 @@ export interface Udhaar {
   personName: string;
   amount: number; // total amount
   type: 'TO_GIVE' | 'TO_RECEIVE';
-  dueDate?: Date;
+  dueDate?: Date | string;
   isSettled: boolean;
   payments: UdhaarPayment[]; // tracking partial payments
   note?: string;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: Date | string;
+  updatedAt: Date | string;
   isDeleted: boolean;
-  deletedAt?: Date;
+  deletedAt?: Date | string;
 }
 
 export interface Reminder {
@@ -215,14 +227,14 @@ export interface Reminder {
   syncId?: string;
   noteId: string; // Refers to Note.syncId (UUID)
   reminderType: 'MEETING' | 'STUDY' | 'WORK' | 'PERSONAL' | 'EVENT';
-  dateTime: Date;
+  dateTime: Date | string;
   isCompleted: boolean;
 }
 
 export interface SyncStatus {
   companyCode?: string; // Tenant Isolation ID
   id?: number;
-  lastSyncAt: Date;
+  lastSyncAt: Date | string;
 }
 
 export interface Bill {
@@ -231,14 +243,14 @@ export interface Bill {
   syncId?: string;
   title: string;
   amount: number;
-  dueDate: Date;
+  dueDate: Date | string;
   isPaid: boolean;
   category?: string;
   note?: string;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: Date | string;
+  updatedAt: Date | string;
   isDeleted: boolean;
-  deletedAt?: Date;
+  deletedAt?: Date | string;
 }
 
 export interface KhataCustomer {
@@ -249,12 +261,13 @@ export interface KhataCustomer {
   phone?: string;
   address?: string;
   openingBalance?: number;
+  balance?: number;
   customerType?: 'PERSON' | 'SHOP';
   locationId?: string; // Refers to Location.syncId
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: Date | string;
+  updatedAt: Date | string;
   isDeleted: boolean;
-  deletedAt?: Date;
+  deletedAt?: Date | string;
 }
 
 export interface Location {
@@ -267,10 +280,10 @@ export interface Location {
   city?: string;
   isActive: boolean;
   isDefault?: boolean;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: Date | string;
+  updatedAt: Date | string;
   isDeleted: boolean;
-  deletedAt?: Date;
+  deletedAt?: Date | string;
 }
 
 export interface Category {
@@ -281,10 +294,10 @@ export interface Category {
   parentId?: string; // Refers to Category.syncId (self-reference, unlimited depth)
   icon?: string;
   isActive: boolean;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: Date | string;
+  updatedAt: Date | string;
   isDeleted: boolean;
-  deletedAt?: Date;
+  deletedAt?: Date | string;
 }
 
 export interface KhataTransaction {
@@ -292,16 +305,17 @@ export interface KhataTransaction {
   id?: number;
   syncId?: string;
   customerId: string; // Refers to KhataCustomer.syncId
-  type: 'CREDIT' | 'DEBIT';
+  type: 'CREDIT' | 'DEBIT' | 'GIVEN' | 'RECEIVED';
   amount: number;
   note?: string;
-  date: Date;
+  description?: string;
+  date: Date | string;
   productId?: string;
   quantity?: number;
-  createdAt: Date;
-  updatedAt: Date;
-  isDeleted: boolean;
-  deletedAt?: Date;
+  createdAt?: Date | string;
+  updatedAt?: Date | string;
+  isDeleted?: boolean;
+  deletedAt?: Date | string;
 }
 
 export interface Vendor {
@@ -312,7 +326,9 @@ export interface Vendor {
   companyName: string;
   phone: string;
   openingBalance: number; // Positive means we owe them
-  createdAt: Date;
+  createdAt: Date | string;
+  isDeleted?: boolean;
+  deletedAt?: Date | string;
 }
 
 export interface PurchaseItem {
@@ -330,12 +346,14 @@ export interface PurchaseOrder {
   syncId?: string;
   vendorId: string;
   poNumber: string;
-  date: Date;
+  date: Date | string;
   items: PurchaseItem[];
   totalAmount: number;
   amountPaid: number; // If amountPaid < totalAmount, it adds to vendor balance
   status: 'PENDING' | 'COMPLETED';
-  createdAt: Date;
+  isDeleted?: boolean;
+  deletedAt?: Date | string;
+  createdAt: Date | string;
 }
 
 export interface Gulluck {
@@ -345,12 +363,14 @@ export interface Gulluck {
   name: string; // e.g., 'New iPhone 15'
   targetAmount: number;
   savedAmount: number;
-  createdAt: Date;
+  isDeleted?: boolean;
+  deletedAt?: Date | string;
+  createdAt: Date | string;
 }
 
 export interface InvoiceItem {
-  companyCode?: string; // Tenant Isolation ID
-  productId: string;
+  id?: string;
+  productId?: string;
   name: string;
   quantity: number;
   unitPrice: number;
@@ -369,8 +389,246 @@ export interface Invoice {
   discount: number;
   total: number;
   paymentMethod: 'CASH' | 'KHATA' | 'BANK';
-  date: Date;
-  createdAt: Date;
+  date: Date | string;
+  isDeleted?: boolean;
+  deletedAt?: Date | string;
+  createdAt: Date | string;
+}
+
+export interface Wallet {
+  id?: number;
+  companyCode?: string;
+  syncId?: string;
+  name: string; // e.g., 'Main Cash Drawer', 'Meezan Bank', 'EasyPaisa'
+  type: 'CASH' | 'BANK' | 'MOBILE';
+  balance: number;
+  currency?: string;
+  isDefault?: boolean;
+  createdAt?: Date | string;
+  updatedAt?: Date | string;
+  isDeleted?: boolean;
+  deletedAt?: Date | string;
+}
+
+export interface Expense {
+  id?: number;
+  companyCode?: string;
+  syncId?: string;
+  category: string; // Dynamic: 'Tea', 'Fuel', 'Electricity'
+  amount: number;
+  walletId: string; // References Wallet.syncId
+  date: string;
+  description: string;
+  loggedBy: string; // References User
+  isDeleted?: boolean;
+  deletedAt?: Date | string;
+}
+
+export interface AuditLog {
+  id?: number;
+  companyCode?: string;
+  syncId?: string;
+  action: 'CREATE' | 'UPDATE' | 'DELETE' | 'LOGIN';
+  entity: string; // e.g., 'INVOICE', 'EXPENSE', 'SETTINGS'
+  entityId: string;
+  userId: string;
+  details: string; // JSON string of what changed
+  timestamp: string;
+  isDeleted?: boolean;
+  deletedAt?: Date | string;
+}
+
+export interface BillOfMaterial {
+  id?: number;
+  companyCode?: string;
+  syncId?: string;
+  finishedProductId: string; // References Product.syncId
+  version?: number;
+  status?: 'draft' | 'active' | 'deprecated';
+  laborTimeEstimateMinutes?: number;
+  overheadRatePerUnit?: number;
+  notes?: string;
+  rawMaterials?: string; // Kept for backwards compatibility
+  costToProduce?: number;
+  createdAt?: Date | string;
+  updatedAt?: Date | string;
+  isDeleted?: boolean;
+  deletedAt?: Date | string;
+}
+
+export interface BOMLineItem {
+  id?: number;
+  companyCode?: string;
+  syncId?: string;
+  bomId: string; // References BillOfMaterial.syncId
+  componentProductId: string; // References Product.syncId
+  quantityPerUnit: number;
+  unit?: string;
+  wastagePercent?: number;
+  notes?: string;
+  createdAt?: Date | string;
+  updatedAt?: Date | string;
+  isDeleted?: boolean;
+  deletedAt?: Date | string;
+}
+
+export interface WorkCenter {
+  id?: number;
+  companyCode?: string;
+  syncId?: string;
+  name: string;
+  type?: 'MACHINE' | 'ASSEMBLY_LINE' | 'PACKAGING' | 'MANUAL';
+  capacityPerHour: number;
+  shiftHoursPerDay?: number;
+  status?: 'ACTIVE' | 'MAINTENANCE' | 'INACTIVE';
+  hourlyCostRate?: number;
+  notes?: string;
+  createdAt?: Date | string;
+  updatedAt?: Date | string;
+  isDeleted?: boolean;
+  deletedAt?: Date | string;
+}
+
+export interface WorkOrder {
+  id?: number;
+  companyCode?: string;
+  syncId?: string;
+  orderNumber: string;
+  productId: string; // References Product.syncId
+  bomId: string; // References BillOfMaterial.syncId
+  bomVersionSnapshot: number;
+  quantityPlanned: number;
+  quantityProduced?: number;
+  status: 'planned' | 'released' | 'in_progress' | 'completed' | 'cancelled';
+  priority?: 'low' | 'medium' | 'high' | 'urgent';
+  scheduledStartDate?: Date | string;
+  scheduledEndDate?: Date | string;
+  actualStartDate?: Date | string;
+  actualEndDate?: Date | string;
+  notes?: string;
+  createdAt?: Date | string;
+  updatedAt?: Date | string;
+  isDeleted?: boolean;
+  deletedAt?: Date | string;
+}
+
+export interface WorkOrderOperation {
+  id?: number;
+  companyCode?: string;
+  syncId?: string;
+  workOrderId: string; // References WorkOrder.syncId
+  workCenterId: string; // References WorkCenter.syncId
+  sequenceNumber: number;
+  plannedDurationMinutes: number;
+  actualStartTime?: Date | string;
+  actualEndTime?: Date | string;
+  quantityCompleted?: number;
+  status: 'pending' | 'in_progress' | 'completed' | 'skipped';
+  operatorNotes?: string;
+  createdAt?: Date | string;
+  updatedAt?: Date | string;
+  isDeleted?: boolean;
+  deletedAt?: Date | string;
+}
+
+export interface MachineDowntimeLog {
+  id?: number;
+  companyCode?: string;
+  syncId?: string;
+  workCenterId: string; // References WorkCenter.syncId
+  startTime: Date | string;
+  endTime?: Date | string;
+  durationMinutes?: number;
+  reasonCode: 'breakdown' | 'maintenance' | 'material_wait' | 'changeover' | 'power_outage' | 'other';
+  notes?: string;
+  loggedByUserId?: number;
+  createdAt?: Date | string;
+  updatedAt?: Date | string;
+  isDeleted?: boolean;
+  deletedAt?: Date | string;
+}
+
+export interface MaterialConsumption {
+  id?: number;
+  companyCode?: string;
+  syncId?: string;
+  workOrderId: string; // References WorkOrder.syncId
+  componentProductId: string; // References Product.syncId
+  quantityReserved?: number;
+  quantityConsumed: number;
+  lotNumber?: string;
+  serialNumber?: string;
+  stockMovementId?: string;
+  notes?: string;
+  createdAt?: Date | string;
+  updatedAt?: Date | string;
+  isDeleted?: boolean;
+  deletedAt?: Date | string;
+}
+
+export interface WorkInstruction {
+  id?: number;
+  companyCode?: string;
+  syncId?: string;
+  bomId?: string;
+  workCenterId?: string;
+  title: string;
+  version: number;
+  content: string;
+  effectiveDate?: Date | string;
+  status: 'active' | 'superseded';
+  createdAt?: Date | string;
+  updatedAt?: Date | string;
+  isDeleted?: boolean;
+  deletedAt?: Date | string;
+}
+
+export interface QualityDefectLog {
+  id?: number;
+  companyCode?: string;
+  syncId?: string;
+  workOrderId: string; // References WorkOrder.syncId
+  workOrderOperationId?: string; // References WorkOrderOperation.syncId
+  defectType: 'dimensional' | 'surface' | 'material' | 'assembly' | 'packaging' | 'other';
+  quantityDefective: number;
+  lotNumber?: string;
+  notes?: string;
+  loggedByUserId?: number;
+  timestamp: Date | string;
+  createdAt?: Date | string;
+  updatedAt?: Date | string;
+  isDeleted?: boolean;
+  deletedAt?: Date | string;
+}
+
+export interface WorkOrderCostPosting {
+  id?: number;
+  companyCode?: string;
+  syncId?: string;
+  workOrderId: string; // References WorkOrder.syncId
+  materialCost: number;
+  laborCost: number;
+  overheadCost: number;
+  totalCost: number;
+  ledgerEntryId: string;
+  postedAt: Date | string;
+  postedByUserId: number;
+  createdAt?: Date | string;
+  updatedAt?: Date | string;
+  isDeleted?: boolean;
+  deletedAt?: Date | string;
+}
+
+export interface ProductionLog {
+  id?: number;
+  companyCode?: string;
+  syncId?: string;
+  finishedProductId: string;
+  quantityProduced: number;
+  date: string;
+  loggedBy: string;
+  isDeleted?: boolean;
+  deletedAt?: Date | string;
 }
 
 export interface PdfTemplate {
@@ -380,6 +638,8 @@ export interface PdfTemplate {
   name: string;
   elementsData: string; // JSON string of the CanvasElement[]
   createdAt: string;
+  isDeleted?: boolean;
+  deletedAt?: Date | string;
 }
 
 export interface Product {
@@ -394,6 +654,8 @@ export interface Product {
   brand?: string;
   costPrice?: number;
   sellingPrice: number;
+  price?: number; // Alias for sellingPrice
+  stockQuantity?: number; // Current stock count
   currency?: string;
   unit: string;
   lowStockThreshold: number;
@@ -403,17 +665,17 @@ export interface Product {
   supplierName?: string;
   supplierContact?: string;
   warehouseLocation?: string;
-  expiryDate?: Date;
+  expiryDate?: Date | string;
   weight?: number;
   tags?: string[];
   taxRate?: number;
   discountPercent?: number;
   isActive: boolean;
   locationId?: string; // Refers to Location.syncId
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: Date | string;
+  updatedAt: Date | string;
   isDeleted: boolean;
-  deletedAt?: Date;
+  deletedAt?: Date | string;
 }
 
 export interface ProductVariant {
@@ -425,10 +687,10 @@ export interface ProductVariant {
   sku?: string;
   priceOverride?: number; // falls back to the parent Product.sellingPrice when unset
   isActive: boolean;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: Date | string;
+  updatedAt: Date | string;
   isDeleted: boolean;
-  deletedAt?: Date;
+  deletedAt?: Date | string;
 }
 
 export interface StockMovement {
@@ -437,26 +699,145 @@ export interface StockMovement {
   syncId?: string;
   productId: string; // Refers to Product.syncId
   variantId?: string; // Refers to ProductVariant.syncId (optional)
-  type: 'STOCK_IN' | 'STOCK_OUT' | 'ADJUSTMENT';
+  type: 'STOCK_IN' | 'STOCK_OUT' | 'ADJUSTMENT' | 'IN' | 'OUT';
   quantity: number;
   reason?: string;
+  note?: string;
+  date?: string;
   locationId?: string; // Refers to Location.syncId
+  lotNumber?: string;
+  serialNumber?: string;
+  workOrderId?: string; // Refers to WorkOrder.syncId
   deliveryCost?: number;
   deliveryNote?: string;
-  createdAt: Date;
-  updatedAt: Date;
-  isDeleted: boolean;
-  deletedAt?: Date;
+  createdAt?: Date | string;
+  updatedAt?: Date | string;
+  isDeleted?: boolean;
+  deletedAt?: Date | string;
 }
 
 export interface FeatureUsage {
-  companyCode?: string; // Tenant Isolation ID
-  id?: number;
   featureKey: string;
   usedCount: number;
   bonusQuota: number;
   dailyAdViews: number;
-  lastAdViewAt?: Date;
+  lastAdViewAt?: Date | string;
+}
+
+export interface Task {
+  companyCode?: string;
+  id?: number;
+  syncId?: string;
+  title: string;
+  description?: string;
+  category: 'PURCHASE' | 'STAFF' | 'FINANCE' | 'INVENTORY' | 'GENERAL' | 'URGENT';
+  priority: 'LOW' | 'MEDIUM' | 'HIGH';
+  status: 'PENDING' | 'IN_PROGRESS' | 'DONE';
+  dueDate?: string; // YYYY-MM-DD
+  completedAt?: Date | string;
+  assignedTo?: string; // name or role
+  isDeleted?: boolean;
+  deletedAt?: Date | string;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}
+
+export interface ServiceType {
+  companyCode?: string;
+  id?: number;
+  syncId?: string;
+  name: string; // e.g. "Doodh", "Kachra", "Pani Tanker", "Newspaper"
+  unit: 'litre' | 'trip' | 'fixed' | 'custom' | string;
+  defaultRate: number;
+  isDeleted?: boolean;
+  deletedAt?: Date | string;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}
+
+export interface ServiceSubscription {
+  companyCode?: string;
+  id?: number;
+  syncId?: string;
+  customerId: string; // syncId FK -> khataCustomers
+  serviceTypeId: string; // syncId FK -> serviceTypes
+  startDate: string; // YYYY-MM-DD
+  frequency: 'daily' | 'alternate_days' | 'custom';
+  customDays?: number[]; // [1, 2, 3, 4, 5] (0=Sun, 1=Mon, ..., 6=Sat)
+  agreedRate: number;
+  defaultQuantity?: number;
+  status: 'active' | 'paused' | 'ended';
+  isDeleted?: boolean;
+  deletedAt?: Date | string;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}
+
+export interface DeliveryLog {
+  companyCode?: string;
+  id?: number;
+  syncId?: string;
+  subscriptionId: string; // syncId FK -> serviceSubscriptions
+  date: string; // YYYY-MM-DD
+  status: 'received' | 'not_received' | 'skipped';
+  quantity?: number;
+  markedBy: 'owner' | 'staff' | 'customer';
+  markedByUserId?: string | null;
+  source: 'app' | 'whatsapp_link';
+  verificationToken?: string;
+  confirmedAt?: Date | string;
+  isDeleted?: boolean;
+  deletedAt?: Date | string;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}
+
+export interface Role {
+  id?: number;
+  companyCode?: string;
+  syncId?: string;
+  businessId: number;
+  name: string;
+  description?: string;
+  isSystemDefault: boolean;
+  isDeleted?: boolean;
+  deletedAt?: Date | string;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}
+
+export interface RoleModulePermission {
+  id?: number;
+  roleId: string;
+  moduleKey: string;
+  accessLevel: 'none' | 'view' | 'full';
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}
+
+export interface UserRoleAssignment {
+  id?: number;
+  companyCode?: string;
+  syncId?: string;
+  userId: number;
+  roleId: string;
+  businessId: number;
+  assignedBy?: number;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}
+
+export interface PermissionAuditLog {
+  id?: number;
+  companyCode?: string;
+  syncId?: string;
+  businessId: number;
+  actorUserId: number;
+  action: string;
+  targetType: string;
+  targetId: string;
+  details?: any;
+  createdAt: Date | string;
 }
 
 export class MindVaultDB extends Dexie {
@@ -472,6 +853,11 @@ export class MindVaultDB extends Dexie {
   khataCustomers!: Table<KhataCustomer>;
   khataTransactions!: Table<KhataTransaction>;
   products!: Table<Product>;
+  wallets!: Table<Wallet>;
+  expenses!: Table<Expense>;
+  auditLogs!: Table<AuditLog>;
+  boms!: Table<BillOfMaterial>;
+  productionLogs!: Table<ProductionLog>;
   pdfTemplates!: Table<PdfTemplate>;
   stockMovements!: Table<StockMovement>;
   featureUsage!: Table<FeatureUsage>;
@@ -485,14 +871,35 @@ export class MindVaultDB extends Dexie {
   kametiPayments!: Table<KametiPayment>;
   employees!: Table<Employee>;
   attendance!: Table<Attendance>;
+  get attendances(): Table<Attendance> {
+    return this.attendance;
+  }
   advances!: Table<Advance>;
   invoices!: Table<Invoice>;
   gullucks!: Table<Gulluck>;
   vendors!: Table<Vendor>;
   purchaseOrders!: Table<PurchaseOrder>;
+  tasks!: Table<Task>;
+  serviceTypes!: Table<ServiceType>;
+  serviceSubscriptions!: Table<ServiceSubscription>;
+  deliveryLogs!: Table<DeliveryLog>;
+  roles!: Table<Role>;
+  roleModulePermissions!: Table<RoleModulePermission>;
+  userRoleAssignments!: Table<UserRoleAssignment>;
+  permissionAuditLogs!: Table<PermissionAuditLog>;
+  bomLineItems!: Table<BOMLineItem>;
+  workCenters!: Table<WorkCenter>;
+  workOrders!: Table<WorkOrder>;
+  workOrderOperations!: Table<WorkOrderOperation>;
+  machineDowntimeLogs!: Table<MachineDowntimeLog>;
+  materialConsumptions!: Table<MaterialConsumption>;
+  workInstructions!: Table<WorkInstruction>;
+  qualityDefectLogs!: Table<QualityDefectLog>;
+  workOrderCostPostings!: Table<WorkOrderCostPosting>;
 
   constructor() {
     super('MindVaultDB');
+
     this.version(1).stores({
       users: '++id, email',
       notes: '++id, type, category, createdAt, isFavorite, isDeleted',
@@ -503,300 +910,16 @@ export class MindVaultDB extends Dexie {
       reminders: '++id, noteId, reminderType, dateTime, isCompleted'
     });
 
-    this.version(2).stores({
-      users: '++id, email',
-      notes: '++id, type, category, createdAt, updatedAt, isFavorite, isDeleted',
-      documents: '++id, noteId, folder',
-      annotations: '++id, documentId, pageNumber',
-      ledgerEntries: '++id, type, category, date, updatedAt',
-      udhaar: '++id, personName, type, isSettled, updatedAt',
-      reminders: '++id, noteId, reminderType, dateTime, isCompleted',
-      syncStatus: '++id'
-    }).upgrade(tx => {
-      // Add updatedAt to existing records where missing
-      const now = new Date();
-      tx.table('ledgerEntries').toCollection().modify(entry => {
-        if (!entry.updatedAt) entry.updatedAt = entry.createdAt || now;
-      });
-      tx.table('udhaar').toCollection().modify(entry => {
-        if (!entry.updatedAt) entry.updatedAt = entry.createdAt || now;
-      });
-    });
-
-    this.version(3).stores({
-      users: '++id, email',
-      notes: '++id, type, category, createdAt, updatedAt, isFavorite, isDeleted',
-      documents: '++id, noteId, folder',
-      annotations: '++id, documentId, pageNumber',
-      ledgerEntries: '++id, type, category, date, updatedAt',
-      udhaar: '++id, personName, type, isSettled, updatedAt',
-      reminders: '++id, noteId, reminderType, dateTime, isCompleted',
-      syncStatus: '++id',
-      bills: '++id, dueDate, isPaid, isDeleted, updatedAt'
-    });
-
-    this.version(4).stores({
-      users: '++id, email',
-      notes: '++id, syncId, type, category, createdAt, updatedAt, isFavorite, isDeleted',
-      documents: '++id, syncId, noteId, folder',
-      annotations: '++id, syncId, documentId, pageNumber',
-      ledgerEntries: '++id, syncId, type, category, date, updatedAt',
-      udhaar: '++id, syncId, personName, type, isSettled, updatedAt',
-      reminders: '++id, syncId, noteId, reminderType, dateTime, isCompleted',
-      syncStatus: '++id',
-      bills: '++id, syncId, dueDate, isPaid, isDeleted, updatedAt'
-    }).upgrade(async tx => {
-      const generateUUID = () => {
-        if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-          return crypto.randomUUID();
-        }
-        // Fallback for older browsers if needed
-        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-          var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
-          return v.toString(16);
-        });
-      };
-
-      await tx.table('notes').toCollection().modify(record => {
-        if (!record.syncId) record.syncId = generateUUID();
-      });
-      await tx.table('ledgerEntries').toCollection().modify(record => {
-        if (!record.syncId) record.syncId = generateUUID();
-      });
-      await tx.table('udhaar').toCollection().modify(record => {
-        if (!record.syncId) record.syncId = generateUUID();
-      });
-      await tx.table('bills').toCollection().modify(record => {
-        if (!record.syncId) record.syncId = generateUUID();
-      });
-    });
-
-    this.version(5).stores({
-      users: '++id, email',
-      notes: '++id, syncId, type, category, createdAt, updatedAt, isFavorite, isDeleted',
-      documents: '++id, syncId, noteId, folder',
-      annotations: '++id, syncId, documentId, pageNumber',
-      ledgerEntries: '++id, syncId, type, category, date, updatedAt, isDeleted',
-      udhaar: '++id, syncId, personName, type, isSettled, updatedAt, isDeleted',
-      reminders: '++id, syncId, noteId, reminderType, dateTime, isCompleted',
-      syncStatus: '++id',
-      bills: '++id, syncId, dueDate, isPaid, isDeleted, updatedAt'
-    }).upgrade(async tx => {
-      await tx.table('ledgerEntries').toCollection().modify(record => {
-        if (record.isDeleted === undefined) record.isDeleted = false;
-      });
-      await tx.table('udhaar').toCollection().modify(record => {
-        if (record.isDeleted === undefined) record.isDeleted = false;
-      });
-    });
-
-    this.version(6).stores({
-      users: '++id, email',
-      notes: '++id, syncId, type, category, createdAt, updatedAt, isFavorite, isDeleted',
-      documents: '++id, syncId, noteId, folder',
-      annotations: '++id, syncId, documentId, pageNumber',
-      ledgerEntries: '++id, syncId, type, category, date, updatedAt, isDeleted',
-      udhaar: '++id, syncId, personName, type, isSettled, updatedAt, isDeleted',
-      reminders: '++id, syncId, noteId, reminderType, dateTime, isCompleted',
-      syncStatus: '++id',
-      bills: '++id, syncId, dueDate, isPaid, isDeleted, updatedAt',
-      khataCustomers: '++id, syncId, name, phone, updatedAt, isDeleted',
-      khataTransactions: '++id, syncId, customerId, type, date, updatedAt, isDeleted'
-    });
-
-    this.version(7).stores({
-      users: '++id, email',
-      notes: '++id, syncId, type, category, createdAt, updatedAt, isFavorite, isDeleted',
-      documents: '++id, syncId, noteId, folder',
-      annotations: '++id, syncId, documentId, pageNumber',
-      ledgerEntries: '++id, syncId, type, category, date, updatedAt, isDeleted',
-      udhaar: '++id, syncId, personName, type, isSettled, updatedAt, isDeleted',
-      reminders: '++id, syncId, noteId, reminderType, dateTime, isCompleted',
-      syncStatus: '++id',
-      bills: '++id, syncId, dueDate, isPaid, isDeleted, updatedAt',
-      khataCustomers: '++id, syncId, name, phone, updatedAt, isDeleted',
-      khataTransactions: '++id, syncId, customerId, type, date, updatedAt, isDeleted'
-    }).upgrade(async tx => {
-      // 1. Migrate documents.noteId (numeric local ID -> Note.syncId string)
-      const notes = await tx.table('notes').toArray();
-      const noteIdToSyncIdMap = new Map<number, string>();
-      notes.forEach(n => {
-        if (n.id && n.syncId) noteIdToSyncIdMap.set(n.id, n.syncId);
-      });
-
-      const documents = await tx.table('documents').toArray();
-      const docIdToSyncIdMap = new Map<number, string>();
-      for (const doc of documents) {
-        if (typeof doc.noteId === 'number') {
-          const parentSyncId = noteIdToSyncIdMap.get(doc.noteId);
-          if (parentSyncId) {
-            doc.noteId = parentSyncId;
-            await tx.table('documents').put(doc);
-          }
-        }
-        if (doc.id && doc.syncId) docIdToSyncIdMap.set(doc.id, doc.syncId);
-      }
-
-      // 2. Migrate annotations.documentId (numeric local ID -> Document.syncId string)
-      const annotations = await tx.table('annotations').toArray();
-      for (const ann of annotations) {
-        if (typeof ann.documentId === 'number') {
-          const parentSyncId = docIdToSyncIdMap.get(ann.documentId);
-          if (parentSyncId) {
-            ann.documentId = parentSyncId;
-            await tx.table('annotations').put(ann);
-          }
-        }
-      }
-
-      // 3. Migrate reminders.noteId (numeric local ID -> Note.syncId string)
-      const reminders = await tx.table('reminders').toArray();
-      for (const rem of reminders) {
-        if (typeof rem.noteId === 'number') {
-          const parentSyncId = noteIdToSyncIdMap.get(rem.noteId);
-          if (parentSyncId) {
-            rem.noteId = parentSyncId;
-            await tx.table('reminders').put(rem);
-          }
-        }
-      }
-    });
-
-    this.version(8).stores({
-      users: '++id, email',
-      notes: '++id, syncId, type, category, createdAt, updatedAt, isFavorite, isDeleted',
-      documents: '++id, syncId, noteId, folder',
-      annotations: '++id, syncId, documentId, pageNumber',
-      ledgerEntries: '++id, syncId, type, category, date, updatedAt, isDeleted',
-      udhaar: '++id, syncId, personName, type, isSettled, updatedAt, isDeleted',
-      reminders: '++id, syncId, noteId, reminderType, dateTime, isCompleted',
-      syncStatus: '++id',
-      bills: '++id, syncId, dueDate, isPaid, isDeleted, updatedAt',
-      khataCustomers: '++id, syncId, name, phone, updatedAt, isDeleted',
-      khataTransactions: '++id, syncId, customerId, type, date, updatedAt, isDeleted',
-      products: '++id, syncId, sku, name, category, isDeleted, updatedAt',
-      stockMovements: '++id, syncId, productId, type, isDeleted',
-      featureUsage: '++id, featureKey'
-    });
-
-    this.version(9).stores({
-      users: '++id, email',
-      notes: '++id, syncId, type, category, createdAt, updatedAt, isFavorite, isDeleted',
-      documents: '++id, syncId, noteId, folder',
-      annotations: '++id, syncId, documentId, pageNumber',
-      ledgerEntries: '++id, syncId, type, category, date, updatedAt, isDeleted',
-      udhaar: '++id, syncId, personName, type, isSettled, updatedAt, isDeleted',
-      reminders: '++id, syncId, noteId, reminderType, dateTime, isCompleted',
-      syncStatus: '++id',
-      bills: '++id, syncId, dueDate, isPaid, isDeleted, updatedAt',
-      khataCustomers: '++id, syncId, name, phone, updatedAt, isDeleted',
-      khataTransactions: '++id, syncId, customerId, type, date, updatedAt, isDeleted',
-      products: '++id, syncId, sku, name, category, isDeleted, createdAt, updatedAt',
-      stockMovements: '++id, syncId, productId, type, isDeleted, createdAt, updatedAt',
-      featureUsage: '++id, featureKey'
-    });
-
-    this.version(10).stores({
-      users: '++id, email',
-      notes: '++id, syncId, type, category, createdAt, updatedAt, isFavorite, isDeleted',
-      documents: '++id, syncId, noteId, folder',
-      annotations: '++id, syncId, documentId, pageNumber',
-      ledgerEntries: '++id, syncId, type, category, date, updatedAt, isDeleted',
-      udhaar: '++id, syncId, personName, type, isSettled, updatedAt, isDeleted',
-      reminders: '++id, syncId, noteId, reminderType, dateTime, isCompleted',
-      syncStatus: '++id',
-      bills: '++id, syncId, dueDate, isPaid, isDeleted, updatedAt',
-      khataCustomers: '++id, syncId, name, phone, customerType, updatedAt, isDeleted',
-      khataTransactions: '++id, syncId, customerId, type, date, productId, updatedAt, isDeleted',
-      products: '++id, syncId, sku, name, category, isDeleted, createdAt, updatedAt',
-      stockMovements: '++id, syncId, productId, type, isDeleted, createdAt, updatedAt',
-      featureUsage: '++id, featureKey'
-    });
-
-    // v11: adds Note.summary, written by the AI Note Assistant (Gemini-backed
-    // /api/ai/notes/summarize). No index needed - only ever read/written by id.
-    this.version(11).stores({
-      notes: '++id, syncId, type, category, createdAt, updatedAt, isFavorite, isDeleted'
-    });
-
-    // v12: adds User.country/city/religion/namazRemindersEnabled, collected at
-    // registration. None are queried by value, so no new index is needed.
-    this.version(12).stores({
-      users: '++id, email'
-    });
-
-    // v13: adds Location (structured branch/warehouse entity), plus optional
-    // locationId on Product/StockMovement/KhataCustomer, businessType on User, and
-    // deliveryCost/deliveryNote on StockMovement. All new fields are optional, so
-    // no .upgrade() is needed - existing rows are valid with them left undefined.
-    this.version(13).stores({
-      locations: '++id, syncId, name, isDeleted, updatedAt',
-      products: '++id, syncId, sku, name, category, isDeleted, createdAt, updatedAt, locationId',
-      stockMovements: '++id, syncId, productId, type, isDeleted, createdAt, updatedAt, locationId',
-      khataCustomers: '++id, syncId, name, phone, customerType, updatedAt, isDeleted, locationId',
-      users: '++id, email'
-    });
-
-    // v14: adds Category (self-referencing, unlimited-depth tree via parentId), plus
-    // optional categoryId on Product for a structured FK alongside the existing free-text
-    // category field (kept for backward-compat display). No .upgrade() needed - categoryId
-    // is optional so existing product rows are valid with it left undefined.
-    this.version(14).stores({
-      categories: '++id, syncId, name, parentId, isDeleted, updatedAt',
-      products: '++id, syncId, sku, name, category, isDeleted, createdAt, updatedAt, locationId, categoryId',
-    });
-
-    // v15: adds ProductVariant (optional per-product size/color options, e.g.
-    // Small/Medium/Large), plus optional variantId on StockMovement so a variant can
-    // carry its own stock. Variants are opt-in - a product with none behaves exactly as
-    // before. variantId is optional, so no .upgrade() is needed - existing stock
-    // movement rows are valid with it left undefined.
-    this.version(15).stores({
-      productVariants: '++id, syncId, productId, isDeleted, updatedAt',
-      stockMovements: '++id, syncId, productId, type, isDeleted, createdAt, updatedAt, locationId, variantId',
-    });
-
-    // v16: adds ChatMessage (per-note AI chat thread - "continue chatting to enhance this
-    // idea"). Brand new table, no .upgrade() needed.
-    this.version(16).stores({
-      chatMessages: '++id, syncId, noteId, createdAt',
-    });
-
-    this.version(17).stores({
-      budgets: '++id, syncId, category, month, isDeleted'
-    });
-
-    this.version(18).stores({
-      saleSearchHistory: '++id, syncId, brand, category, createdAt'
-    });
-
-    this.version(19).stores({
-      kametis: '++id, syncId, name, startDate',
-      kametiPayments: '++id, syncId, kametiId, memberName, monthNumber, isPaid'
-    });
-
-    this.version(20).stores({
-      employees: '++id, syncId, name, isActive',
-      attendance: '++id, syncId, employeeId, date, status',
-      advances: '++id, syncId, employeeId, date, isDeducted'
-    });
-
-    this.version(21).stores({
-      invoices: '++id, syncId, invoiceNumber, customerId, date'
-    });
-
-    this.version(22).stores({
-      gullucks: '++id, syncId, name'
-    });
-
-    this.version(23).stores({
-      vendors: '++id, syncId, name',
-      purchaseOrders: '++id, syncId, vendorId, poNumber'
-    });
-
-    this.version(25).stores({
+    this.version(27).stores({
+      users: '++id, companyCode, email',
       notes: '++id, companyCode, syncId, category, isPinned',
+      documents: '++id, companyCode, syncId, noteId, folder',
+      annotations: '++id, companyCode, syncId, documentId, pageNumber',
       ledgerEntries: '++id, companyCode, syncId, type, date',
+      udhaar: '++id, companyCode, syncId, personName, type, isSettled',
+      reminders: '++id, companyCode, syncId, noteId, reminderType, dateTime',
+      syncStatus: '++id, companyCode',
+      bills: '++id, companyCode, syncId, dueDate, isPaid',
       budgets: '++id, companyCode, syncId, month',
       saleSearchHistory: '++id, companyCode, syncId, timestamp',
       kametis: '++id, companyCode, syncId, status',
@@ -807,16 +930,103 @@ export class MindVaultDB extends Dexie {
       vendors: '++id, companyCode, syncId, name',
       purchaseOrders: '++id, companyCode, syncId, vendorId, poNumber',
       invoices: '++id, companyCode, syncId, invoiceNumber, customerId, date',
-      khataCustomers: '++id, companyCode, syncId',
+      gullucks: '++id, companyCode, syncId, name',
+      khataCustomers: '++id, companyCode, syncId, name',
       khataTransactions: '++id, companyCode, syncId, customerId, date',
-      products: '++id, companyCode, syncId, categoryId',
+      products: '++id, companyCode, syncId, categoryId, name',
       productVariants: '++id, companyCode, syncId, productId',
       stockMovements: '++id, companyCode, syncId, productId, type, date',
       featureUsage: '++id, companyCode, syncId, featureKey',
+      locations: '++id, companyCode, syncId, name',
+      categories: '++id, companyCode, syncId, name, parentId',
+      chatMessages: '++id, companyCode, syncId, noteId',
       pdfTemplates: '++id, companyCode, syncId, name',
+      wallets: '++id, companyCode, syncId, type',
+      expenses: '++id, companyCode, syncId, walletId, date',
+      auditLogs: '++id, companyCode, syncId, entity, timestamp',
+      boms: '++id, companyCode, syncId, finishedProductId',
+      productionLogs: '++id, companyCode, syncId, finishedProductId, date',
+    });
+
+    this.version(28).stores({
+      tasks: '++id, companyCode, syncId, status, priority, category, dueDate',
     });
     
-    // Automatically generate syncId for new records
+    this.version(29).stores({
+      notes: '++id, companyCode, syncId, category, isPinned, updatedAt'
+    });
+    
+    this.version(30).stores({
+      chatMessages: '++id, companyCode, syncId, noteId, createdAt'
+    });
+    
+    
+    this.version(31).stores({
+      users: '++id, companyCode, email, createdAt, updatedAt, deletedAt, isDeleted',
+      notes: '++id, companyCode, syncId, category, isPinned, createdAt, updatedAt, deletedAt, isDeleted',
+      documents: '++id, companyCode, syncId, noteId, folder, createdAt, updatedAt, deletedAt, isDeleted',
+      annotations: '++id, companyCode, syncId, documentId, pageNumber, createdAt, updatedAt, deletedAt, isDeleted',
+      ledgerEntries: '++id, companyCode, syncId, type, date, createdAt, updatedAt, deletedAt, isDeleted',
+      udhaar: '++id, companyCode, syncId, personName, type, isSettled, createdAt, updatedAt, deletedAt, isDeleted',
+      reminders: '++id, companyCode, syncId, noteId, reminderType, dateTime, createdAt, updatedAt, deletedAt, isDeleted',
+      syncStatus: '++id, companyCode, createdAt, updatedAt, deletedAt, isDeleted',
+      bills: '++id, companyCode, syncId, dueDate, isPaid, createdAt, updatedAt, deletedAt, isDeleted',
+      budgets: '++id, companyCode, syncId, month, createdAt, updatedAt, deletedAt, isDeleted',
+      saleSearchHistory: '++id, companyCode, syncId, timestamp, createdAt, updatedAt, deletedAt, isDeleted',
+      kametis: '++id, companyCode, syncId, status, createdAt, updatedAt, deletedAt, isDeleted',
+      kametiPayments: '++id, companyCode, syncId, kametiId, memberId, monthIndex, createdAt, updatedAt, deletedAt, isDeleted',
+      employees: '++id, companyCode, syncId, isActive, createdAt, updatedAt, deletedAt, isDeleted',
+      attendance: '++id, companyCode, syncId, employeeId, date, createdAt, updatedAt, deletedAt, isDeleted',
+      advances: '++id, companyCode, syncId, employeeId, isDeducted, createdAt, updatedAt, deletedAt, isDeleted',
+      vendors: '++id, companyCode, syncId, name, createdAt, updatedAt, deletedAt, isDeleted',
+      purchaseOrders: '++id, companyCode, syncId, vendorId, poNumber, createdAt, updatedAt, deletedAt, isDeleted',
+      invoices: '++id, companyCode, syncId, invoiceNumber, customerId, date, createdAt, updatedAt, deletedAt, isDeleted',
+      gullucks: '++id, companyCode, syncId, name, createdAt, updatedAt, deletedAt, isDeleted',
+      khataCustomers: '++id, companyCode, syncId, name, createdAt, updatedAt, deletedAt, isDeleted',
+      khataTransactions: '++id, companyCode, syncId, customerId, date, createdAt, updatedAt, deletedAt, isDeleted',
+      products: '++id, companyCode, syncId, categoryId, name, createdAt, updatedAt, deletedAt, isDeleted',
+      productVariants: '++id, companyCode, syncId, productId, createdAt, updatedAt, deletedAt, isDeleted',
+      stockMovements: '++id, companyCode, syncId, productId, type, date, createdAt, updatedAt, deletedAt, isDeleted',
+      featureUsage: '++id, companyCode, syncId, featureKey, createdAt, updatedAt, deletedAt, isDeleted',
+      locations: '++id, companyCode, syncId, name, createdAt, updatedAt, deletedAt, isDeleted',
+      categories: '++id, companyCode, syncId, name, parentId, createdAt, updatedAt, deletedAt, isDeleted',
+      chatMessages: '++id, companyCode, syncId, noteId, createdAt, updatedAt, deletedAt, isDeleted',
+      pdfTemplates: '++id, companyCode, syncId, name, createdAt, updatedAt, deletedAt, isDeleted',
+      wallets: '++id, companyCode, syncId, type, createdAt, updatedAt, deletedAt, isDeleted',
+      expenses: '++id, companyCode, syncId, walletId, date, createdAt, updatedAt, deletedAt, isDeleted',
+      auditLogs: '++id, companyCode, syncId, entity, timestamp, createdAt, updatedAt, deletedAt, isDeleted',
+      boms: '++id, companyCode, syncId, finishedProductId, createdAt, updatedAt, deletedAt, isDeleted',
+      productionLogs: '++id, companyCode, syncId, finishedProductId, date, createdAt, updatedAt, deletedAt, isDeleted',
+      tasks: '++id, companyCode, syncId, status, priority, category, dueDate, createdAt, updatedAt, deletedAt, isDeleted'
+    });
+
+    this.version(32).stores({
+      serviceTypes: '++id, companyCode, syncId, name, unit, defaultRate, createdAt, updatedAt, deletedAt, isDeleted',
+      serviceSubscriptions: '++id, companyCode, syncId, customerId, serviceTypeId, startDate, frequency, status, createdAt, updatedAt, deletedAt, isDeleted',
+      deliveryLogs: '++id, companyCode, syncId, subscriptionId, date, status, markedBy, source, verificationToken, [subscriptionId+date], createdAt, updatedAt, deletedAt, isDeleted',
+    });
+
+    this.version(33).stores({
+      roles: '++id, companyCode, syncId, businessId, name, isSystemDefault, createdAt, updatedAt, deletedAt, isDeleted',
+      roleModulePermissions: '++id, roleId, moduleKey, accessLevel, [roleId+moduleKey], createdAt, updatedAt',
+      userRoleAssignments: '++id, companyCode, syncId, userId, roleId, businessId, [userId+businessId], createdAt, updatedAt',
+      permissionAuditLogs: '++id, companyCode, syncId, businessId, actorUserId, action, createdAt'
+    });
+
+    this.version(34).stores({
+      boms: '++id, companyCode, syncId, finishedProductId, status, version, createdAt, updatedAt, deletedAt, isDeleted',
+      bomLineItems: '++id, companyCode, syncId, bomId, componentProductId, createdAt, updatedAt, deletedAt, isDeleted',
+      workCenters: '++id, companyCode, syncId, name, type, status, createdAt, updatedAt, deletedAt, isDeleted',
+      workOrders: '++id, companyCode, syncId, orderNumber, productId, bomId, status, priority, createdAt, updatedAt, deletedAt, isDeleted',
+      workOrderOperations: '++id, companyCode, syncId, workOrderId, workCenterId, sequenceNumber, status, createdAt, updatedAt, deletedAt, isDeleted',
+      machineDowntimeLogs: '++id, companyCode, syncId, workCenterId, reasonCode, startTime, createdAt, updatedAt, deletedAt, isDeleted',
+      materialConsumptions: '++id, companyCode, syncId, workOrderId, componentProductId, lotNumber, serialNumber, createdAt, updatedAt, deletedAt, isDeleted',
+      workInstructions: '++id, companyCode, syncId, bomId, workCenterId, status, version, createdAt, updatedAt, deletedAt, isDeleted',
+      qualityDefectLogs: '++id, companyCode, syncId, workOrderId, workOrderOperationId, defectType, timestamp, createdAt, updatedAt, deletedAt, isDeleted',
+      workOrderCostPostings: '++id, companyCode, syncId, workOrderId, ledgerEntryId, createdAt, updatedAt, deletedAt, isDeleted',
+      stockMovements: '++id, companyCode, syncId, productId, variantId, locationId, lotNumber, serialNumber, workOrderId, type, date, createdAt, updatedAt, deletedAt, isDeleted',
+    });
+
     const generateUUID = () => {
       if (typeof crypto !== 'undefined' && crypto.randomUUID) {
         return crypto.randomUUID();
@@ -827,7 +1037,8 @@ export class MindVaultDB extends Dexie {
       });
     };
 
-    const applyTenantHooks = (table: Table) => {
+    const applyTenantHooks = (table?: Table) => {
+      if (!table || typeof table.hook !== 'function') return;
       table.hook('creating', function (primKey, obj, trans) {
         if (!obj.syncId) {
           obj.syncId = generateUUID();
@@ -861,22 +1072,29 @@ export class MindVaultDB extends Dexie {
     applyTenantHooks(this.categories);
     applyTenantHooks(this.productVariants);
     applyTenantHooks(this.chatMessages);
+    applyTenantHooks(this.pdfTemplates);
+    applyTenantHooks(this.wallets);
+    applyTenantHooks(this.expenses);
+    applyTenantHooks(this.auditLogs);
+    applyTenantHooks(this.boms);
+    applyTenantHooks(this.productionLogs);
+    applyTenantHooks(this.tasks);
+    applyTenantHooks(this.serviceTypes);
+    applyTenantHooks(this.serviceSubscriptions);
+    applyTenantHooks(this.deliveryLogs);
+    applyTenantHooks(this.roles);
+    applyTenantHooks(this.userRoleAssignments);
+    applyTenantHooks(this.permissionAuditLogs);
+    applyTenantHooks(this.bomLineItems);
+    applyTenantHooks(this.workCenters);
+    applyTenantHooks(this.workOrders);
+    applyTenantHooks(this.workOrderOperations);
+    applyTenantHooks(this.machineDowntimeLogs);
+    applyTenantHooks(this.materialConsumptions);
+    applyTenantHooks(this.workInstructions);
+    applyTenantHooks(this.qualityDefectLogs);
+    applyTenantHooks(this.workOrderCostPostings);
   }
 }
 
 export const db = new MindVaultDB();
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

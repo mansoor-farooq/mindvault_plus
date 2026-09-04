@@ -1,5 +1,5 @@
-﻿// Multi-Tier AI Limits Config
-export type PlanTier = 'FREE' | 'PRO' | 'PRO_PLUS' | 'UNLIMITED';
+// Multi-Tier AI Limits Config
+export type PlanTier = 'FREE' | 'STARTER' | 'PRO' | 'PRO_PLUS' | 'UNLIMITED';
 
 export const AI_TIER_LIMITS: Record<PlanTier, Record<string, number>> = {
   FREE: {
@@ -10,6 +10,15 @@ export const AI_TIER_LIMITS: Record<PlanTier, Record<string, number>> = {
     ai_udhaar_reminder: 3,
     ai_budget_advisor: 1,
     ai_copilot: 1,
+  },
+  STARTER: {
+    ai_notes_assist: 25,
+    ai_categorize: 50,
+    ai_ocr_scans: 15,
+    ai_voice_transcribe: 15,
+    ai_udhaar_reminder: 15,
+    ai_budget_advisor: 5,
+    ai_copilot: 10,
   },
   PRO: {
     ai_notes_assist: 100,

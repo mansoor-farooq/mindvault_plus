@@ -1,10 +1,10 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import { db } from '@/lib/db';
-import { ArrowLeft, HardDrive, Loader2, CheckCircle2, AlertTriangle, CloudUpload, Unlink, Building2, Save, Users, Rocket } from 'lucide-react';
+import { ArrowLeft, HardDrive, Loader2, CheckCircle2, AlertTriangle, CloudUpload, Unlink, Building2, Save, Users, Rocket, Mail, HelpCircle, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
 
 interface DriveStatus {
@@ -201,6 +201,19 @@ function SettingsPageInner() {
           </div>
         </Link>
 
+        <Link
+          href="/settings/roles"
+          className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex items-center gap-3 hover:shadow-md transition-shadow"
+        >
+          <div className="p-2.5 rounded-xl bg-indigo-50 text-indigo-600">
+            <ShieldCheck className="w-5 h-5" />
+          </div>
+          <div className="flex-1">
+            <h2 className="font-bold text-gray-800">Roles & Permissions (Layer 2)</h2>
+            <p className="text-xs text-gray-400">Configure custom employee roles and granular 13-module permissions</p>
+          </div>
+        </Link>
+
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-2.5 rounded-xl bg-blue-50 text-blue-500">
@@ -254,6 +267,26 @@ function SettingsPageInner() {
               Connect Google Drive
             </button>
           )}
+        </div>
+
+        {/* Support & Contact Card */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-indigo-50 text-indigo-600">
+              <Mail className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="font-bold text-gray-800">Need Help or Have Inquiries?</h2>
+              <p className="text-xs text-gray-400">Contact our direct support team via verified SMTP mail</p>
+            </div>
+          </div>
+          <Link
+            href="/contact"
+            className="inline-flex items-center gap-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold px-4 py-2 rounded-xl text-xs transition-colors"
+          >
+            <HelpCircle className="w-4 h-4" />
+            Contact Support
+          </Link>
         </div>
       </div>
     </main>

@@ -1,0 +1,420 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                    Int      @id @default(autoincrement())
+  companyCode           String?
+  fullName              String
+  email                 String   @unique
+  passwordHash          String
+  pin                   String?
+  status                String?  @default("ACTIVE")
+  role                  String?  @default("OWNER")
+  license               String?  @default("FREE")
+  country               String?
+  city                  String?
+  religion              String?
+  namazRemindersEnabled Boolean?
+  businessType          String?
+  accountType           String?
+  organizationName      String?
+  orgRole               String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  isDeleted             Boolean  @default(false)
+  deletedAt             DateTime?
+}
+
+model Location {
+  id           Int       @id @default(autoincrement())
+  companyCode  String?
+  syncId       String    @unique
+  name         String
+  locationType String?
+  address      String?
+  city         String?
+  isActive     Boolean   @default(true)
+  isDefault    Boolean?  @default(false)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  isDeleted    Boolean   @default(false)
+  deletedAt    DateTime?
+}
+
+model Category {
+  id          Int       @id @default(autoincrement())
+  companyCode String?
+  syncId      String    @unique
+  name        String
+  parentId    String?
+  icon        String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  isDeleted   Boolean   @default(false)
+  deletedAt   DateTime?
+}
+
+model Product {
+  id                 Int       @id @default(autoincrement())
+  companyCode        String?
+  syncId             String    @unique
+  sku                String
+  name               String
+  description        String?
+  category           String
+  categoryId         String?
+  brand              String?
+  costPrice          Float?
+  sellingPrice       Float
+  price              Float?
+  stockQuantity      Float?    @default(0)
+  currency           String?
+  unit               String
+  lowStockThreshold  Float     @default(5)
+  reorderPoint       Float     @default(5)
+  barcode            String?
+  imageUrls          String[]
+  supplierName       String?
+  isActive           Boolean   @default(true)
+  locationId         String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  isDeleted          Boolean   @default(false)
+  deletedAt          DateTime?
+}
+
+model ProductVariant {
+  id            Int       @id @default(autoincrement())
+  companyCode   String?
+  syncId        String    @unique
+  productId     String
+  name          String
+  sku           String?
+  priceOverride Float?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  isDeleted     Boolean   @default(false)
+  deletedAt     DateTime?
+}
+
+model StockMovement {
+  id            Int       @id @default(autoincrement())
+  companyCode   String?
+  syncId        String    @unique
+  productId     String
+  variantId     String?
+  type          String
+  quantity      Float
+  reason        String?
+  note          String?
+  date          String?
+  locationId    String?
+  deliveryCost  Float?
+  deliveryNote  String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  isDeleted     Boolean   @default(false)
+  deletedAt     DateTime?
+}
+
+model ServiceType {
+  id          Int       @id @default(autoincrement())
+  companyCode String?
+  syncId      String    @unique
+  userId      Int
+  name        String
+  unit        String    @default("fixed")
+  defaultRate Float     @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  isDeleted   Boolean   @default(false)
+  deletedAt   DateTime?
+}
+
+model ServiceSubscription {
+  id              Int       @id @default(autoincrement())
+  companyCode     String?
+  syncId          String    @unique
+  userId          Int
+  customerId      String
+  serviceTypeId   String
+  startDate       String
+  frequency       String    @default("daily")
+  customDays      String?
+  agreedRate      Float
+  defaultQuantity Float?    @default(1)
+  status          String    @default("active")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  isDeleted       Boolean   @default(false)
+  deletedAt       DateTime?
+}
+
+model DeliveryLog {
+  id                Int       @id @default(autoincrement())
+  companyCode       String?
+  syncId            String    @unique
+  userId            Int
+  subscriptionId    String
+  date              String
+  status            String
+  quantity          Float?
+  markedBy          String
+  markedByUserId    String?
+  source            String    @default("app")
+  verificationToken String?   @unique
+  confirmedAt       DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  isDeleted         Boolean   @default(false)
+  deletedAt         DateTime?
+
+  @@unique([subscriptionId, date])
+}
+
+model ModuleDefinition {
+  id          Int      @id @default(autoincrement())
+  moduleKey   String   @unique
+  displayName String
+  category    String
+  createdAt   DateTime @default(now())
+}
+
+model Role {
+  id              Int       @id @default(autoincrement())
+  syncId          String    @unique
+  businessId      Int
+  name            String
+  description     String?
+  isSystemDefault Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  isDeleted       Boolean   @default(false)
+  deletedAt       DateTime?
+
+  @@unique([businessId, name])
+}
+
+model RoleModulePermission {
+  id          Int      @id @default(autoincrement())
+  roleId      String
+  moduleKey   String
+  accessLevel String   // none | view | full
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([roleId, moduleKey])
+}
+
+model UserRoleAssignment {
+  id         Int      @id @default(autoincrement())
+  syncId     String   @unique
+  userId     Int
+  roleId     String
+  businessId Int
+  assignedBy Int?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([userId, businessId])
+}
+
+model PermissionAuditLog {
+  id          Int      @id @default(autoincrement())
+  syncId      String   @unique
+  businessId  Int
+  actorUserId Int
+  action      String
+  targetType  String
+  targetId    String
+  details     String?
+  createdAt   DateTime @default(now())
+}
+
+model BillOfMaterials {
+  id                        Int       @id @default(autoincrement())
+  syncId                    String    @unique
+  businessId                Int
+  finishedProductId         String
+  version                   Int       @default(1)
+  status                    String    @default("draft") // draft | active | deprecated
+  laborTimeEstimateMinutes  Float?    @default(0)
+  overheadRatePerUnit       Float?    @default(0)
+  notes                     String?
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+  isDeleted                 Boolean   @default(false)
+  deletedAt                 DateTime?
+}
+
+model BOMLineItem {
+  id                  Int       @id @default(autoincrement())
+  syncId              String    @unique
+  businessId          Int
+  bomId               String
+  componentProductId  String
+  quantityPerUnit     Float
+  unit                String    @default("pcs")
+  wastagePercent      Float?    @default(0)
+  notes               String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  isDeleted           Boolean   @default(false)
+  deletedAt           DateTime?
+}
+
+model WorkCenter {
+  id                Int       @id @default(autoincrement())
+  syncId            String    @unique
+  businessId        Int
+  name              String
+  type              String    @default("MACHINE") // MACHINE | ASSEMBLY_LINE | PACKAGING | MANUAL
+  capacityPerHour   Float     @default(10)
+  shiftHoursPerDay  Float     @default(8)
+  status            String    @default("ACTIVE") // ACTIVE | MAINTENANCE | INACTIVE
+  hourlyCostRate    Float?    @default(0)
+  notes             String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  isDeleted         Boolean   @default(false)
+  deletedAt         DateTime?
+}
+
+model WorkOrder {
+  id                    Int       @id @default(autoincrement())
+  syncId                String    @unique
+  businessId            Int
+  orderNumber           String
+  productId             String
+  bomId                 String
+  bomVersionSnapshot    Int
+  quantityPlanned       Float
+  quantityProduced      Float     @default(0)
+  status                String    @default("planned") // planned | released | in_progress | completed | cancelled
+  priority              String    @default("medium") // low | medium | high | urgent
+  scheduledStartDate    DateTime?
+  scheduledEndDate      DateTime?
+  actualStartDate       DateTime?
+  actualEndDate         DateTime?
+  notes                 String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  isDeleted             Boolean   @default(false)
+  deletedAt             DateTime?
+}
+
+model WorkOrderOperation {
+  id                      Int       @id @default(autoincrement())
+  syncId                  String    @unique
+  businessId              Int
+  workOrderId             String
+  workCenterId            String
+  sequenceNumber          Int       @default(1)
+  plannedDurationMinutes  Float     @default(60)
+  actualStartTime         DateTime?
+  actualEndTime           DateTime?
+  quantityCompleted       Float     @default(0)
+  status                  String    @default("pending") // pending | in_progress | completed | skipped
+  operatorNotes           String?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+  isDeleted               Boolean   @default(false)
+  deletedAt               DateTime?
+}
+
+model MachineDowntimeLog {
+  id              Int       @id @default(autoincrement())
+  syncId          String    @unique
+  businessId      Int
+  workCenterId    String
+  startTime       DateTime
+  endTime         DateTime?
+  durationMinutes Float?
+  reasonCode      String    @default("other") // breakdown | maintenance | material_wait | changeover | power_outage | other
+  notes           String?
+  loggedByUserId  Int
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  isDeleted       Boolean   @default(false)
+  deletedAt       DateTime?
+}
+
+model MaterialConsumption {
+  id                  Int       @id @default(autoincrement())
+  syncId              String    @unique
+  businessId          Int
+  workOrderId         String
+  componentProductId  String
+  quantityReserved    Float?    @default(0)
+  quantityConsumed    Float     @default(0)
+  lotNumber           String?
+  serialNumber        String?
+  stockMovementId     String?
+  notes               String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  isDeleted           Boolean   @default(false)
+  deletedAt           DateTime?
+}
+
+model WorkInstruction {
+  id            Int       @id @default(autoincrement())
+  syncId        String    @unique
+  businessId    Int
+  bomId         String?
+  workCenterId  String?
+  title         String
+  version       Int       @default(1)
+  content       String
+  effectiveDate DateTime? @default(now())
+  status        String    @default("active") // active | superseded
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  isDeleted     Boolean   @default(false)
+  deletedAt     DateTime?
+}
+
+model QualityDefectLog {
+  id                      Int       @id @default(autoincrement())
+  syncId                  String    @unique
+  businessId              Int
+  workOrderId             String
+  workOrderOperationId    String?
+  defectType              String    @default("other") // dimensional | surface | material | assembly | packaging | other
+  quantityDefective       Float     @default(1)
+  lotNumber               String?
+  notes                   String?
+  loggedByUserId          Int
+  timestamp               DateTime  @default(now())
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+  isDeleted               Boolean   @default(false)
+  deletedAt               DateTime?
+}
+
+model WorkOrderCostPosting {
+  id              Int       @id @default(autoincrement())
+  syncId          String    @unique
+  businessId      Int
+  workOrderId     String
+  materialCost    Float     @default(0)
+  laborCost       Float     @default(0)
+  overheadCost    Float     @default(0)
+  totalCost       Float     @default(0)
+  ledgerEntryId   String
+  postedAt        DateTime  @default(now())
+  postedByUserId  Int
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  isDeleted       Boolean   @default(false)
+  deletedAt       DateTime?
+}
+
